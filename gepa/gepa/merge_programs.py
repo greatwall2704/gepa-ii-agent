@@ -1,18 +1,21 @@
-def does_triplet_have_desirable_predictors(program_candidates, ancestor, id1, id2):
+from copy import deepcopy
+from typing import Dict, List
+
+def does_triplet_have_desirable_predictors(program_candidates: List[Dict[str, str]], ancestor, id1, id2):
     found_predictors = []
-    for pred_idx, (pred_anc, pred_id1, pred_id2) in enumerate(zip(
-        program_candidates[ancestor].named_predictors(),
-        program_candidates[id1].named_predictors(),
-        program_candidates[id2].named_predictors()
-    )):
+    pred_names = set(program_candidates[ancestor].keys())
+    for pred_idx, pred_name in enumerate(pred_names):
+        pred_anc = program_candidates[ancestor][pred_name]
+        pred_id1 = program_candidates[id1][pred_name]
+        pred_id2 = program_candidates[id2][pred_name]
         if (
-            (pred_anc[1].signature.instructions == pred_id1[1].signature.instructions) or 
-            (pred_anc[1].signature.instructions == pred_id2[1].signature.instructions)
+            (pred_anc == pred_id1) or
+            (pred_anc == pred_id2)
         ) and (
-            pred_id1[1].signature.instructions != pred_id2[1].signature.instructions
+            pred_id1 != pred_id2
         ):
             # We have a predictor that is the same as one of its ancestors, so we can update it with the other
-            same_as_ancestor_id = (1 if pred_anc[1].signature.instructions == pred_id1[1].signature.instructions else 2)
+            same_as_ancestor_id = (1 if pred_anc == pred_id1 else 2)
             found_predictors.append((pred_idx, same_as_ancestor_id))
     
     return len(found_predictors) > 0
@@ -68,7 +71,7 @@ def find_common_ancestor_pair(rng, parent_list, program_indexes, merges_performe
 
     return None
 
-def sample_and_attempt_merge_programs_by_common_predictors(agg_scores, rng, merge_candidates, merges_performed, program_candidates, parent_program_for_candidate, max_attempts=10):
+def sample_and_attempt_merge_programs_by_common_predictors(agg_scores, rng, merge_candidates, merges_performed, program_candidates: List[Dict[str, str]], parent_program_for_candidate, max_attempts=10):
     if len(merge_candidates) < 2:
         return (False, None, None, None, None)
     if len(parent_program_for_candidate) < 3:
@@ -88,46 +91,46 @@ def sample_and_attempt_merge_programs_by_common_predictors(agg_scores, rng, merg
 
         # Now we have a common ancestor, which is outperformed by both its descendants
 
-        new_program = program_candidates[ancestor].deepcopy()
-        curr_prog_lm = program_candidates[ancestor].get_lm()
-        new_program.set_lm(curr_prog_lm)
+        new_program = deepcopy(program_candidates[ancestor])
 
         new_prog_desc = ()
 
-        for pred_idx, (pred_anc, pred_id1, pred_id2) in enumerate(zip(
-            program_candidates[ancestor].named_predictors(),
-            program_candidates[id1].named_predictors(),
-            program_candidates[id2].named_predictors()
-        )):
+        pred_names = set(program_candidates[ancestor].keys())
+        assert pred_names == set(program_candidates[id1].keys()) == set(program_candidates[id2].keys()), "Predictors should be the same across all programs"
+        for pred_name in pred_names:
+            pred_anc = program_candidates[ancestor][pred_name]
+            pred_id1 = program_candidates[id1][pred_name]
+            pred_id2 = program_candidates[id2][pred_name]
             if (
-                (pred_anc[1].signature.instructions == pred_id1[1].signature.instructions) or 
-                (pred_anc[1].signature.instructions == pred_id2[1].signature.instructions)
+                (pred_anc == pred_id1) or 
+                (pred_anc == pred_id2)
             ) and (
-                pred_id1[1].signature.instructions != pred_id2[1].signature.instructions
+                pred_id1 != pred_id2
             ):
                 # We have a predictor that is the same as one of its ancestors, so we can update it with the other
-                same_as_ancestor_id = (1 if pred_anc[1].signature.instructions == pred_id1[1].signature.instructions else 2)
-                new_program.named_predictors()[pred_idx][1].signature = program_candidates[id2 if same_as_ancestor_id == 1 else id1].named_predictors()[pred_idx][1].signature
+                same_as_ancestor_id = (1 if pred_anc == pred_id1 else 2)
+                # new_program.named_predictors()[pred_idx][1].signature = program_candidates[id2 if same_as_ancestor_id == 1 else id1].named_predictors()[pred_idx][1].signature
+                new_program[pred_name] = program_candidates[id2 if same_as_ancestor_id == 1 else id1][pred_name]
                 new_prog_desc = (*new_prog_desc, id2 if same_as_ancestor_id == 1 else id1)
             elif (
-                (pred_anc[1].signature.instructions != pred_id1[1].signature.instructions) and
-                (pred_anc[1].signature.instructions != pred_id2[1].signature.instructions)
+                (pred_anc != pred_id1) and
+                (pred_anc != pred_id2)
             ):
                 # Both predictors are different from  the ancestor, and it is difficult to decide which one gives the benefits
                 # We randomly select one of the descendants to update the predictor
                 # The probability of selecting is proportional to the agg_scores of the descendants
                 # prog_to_get_instruction_from = id1 if (rng.random() < (agg_scores[id1] / (agg_scores[id1] + agg_scores[id2]))) else id2
                 prog_to_get_instruction_from = id1 if (agg_scores[id1] > agg_scores[id2]) else (id2 if agg_scores[id2] > agg_scores[id1] else rng.choice([id1, id2]))
-                new_program.named_predictors()[pred_idx][1].signature = program_candidates[prog_to_get_instruction_from].named_predictors()[pred_idx][1].signature
+                new_program[pred_name] = program_candidates[prog_to_get_instruction_from][pred_name]
                 new_prog_desc = (*new_prog_desc, prog_to_get_instruction_from)
             elif (
-                pred_id1[1].signature.instructions == pred_id2[1].signature.instructions
+                pred_id1 == pred_id2
             ):
                 # Either both predictors are the same, or both are different from the ancestor
                 # If both are different from the ancestor, we should use the new predictor, so selecting either one of the descendants is fine
                 # If both are same as the ancesor, again selecting any one of the descendants is fine
                 # So let's select id1
-                new_program.named_predictors()[pred_idx][1].signature = program_candidates[id1].named_predictors()[pred_idx][1].signature
+                new_program[pred_name] = program_candidates[id1][pred_name]
                 new_prog_desc = (*new_prog_desc, id1)
             else:
                 assert False, "Unexpected case in predictor merging logic"
