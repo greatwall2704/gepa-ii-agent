@@ -2,7 +2,7 @@ from ast import Set
 import math
 import random
 import traceback
-from typing import Any, Dict, Tuple, Union, Callable
+from typing import Any, Dict, Tuple, TypeVar, Union, Callable, Generic
 
 from typing import List, Set
 from collections import Counter
@@ -25,7 +25,17 @@ class ContinueException(Exception):
     """Exception to indicate that the current iteration should be skipped."""
     pass
 
-class GEPA:
+RolloutOutput = TypeVar('RolloutOutput')
+Trajectory = TypeVar('Trajectory')
+DataInst = TypeVar('DataInst')
+
+class GEPA(Generic[DataInst, Trajectory, RolloutOutput]):
+    gepa_state: GEPAState
+    eval_and_get_outputs: Callable[[List[DataInst], Dict[str, str]], Tuple[List[RolloutOutput], List[float]]]
+    capture_traces_and_eval: Callable[[List[DataInst], Dict[str, str]], Tuple[List[Trajectory], List[float]]]
+    extract_reflection_content_from_trajectories: Callable[[Dict[str, str], List[Trajectory], List[float], List[str]], Dict[str, List[Dict[str, str]]]]
+    reflect_and_propose_new_text_candidate: Callable[[Dict[str, str], Dict[str, List[Dict[str, str]]], List[str]], Dict[str, str]]
+
     def __init__(
         self,
         logger,
@@ -34,8 +44,7 @@ class GEPA:
         num_iters=None,
         perfect_score=1,
         use_wandb: bool = False,
-        wandb_api_key: str = None,
-        max_evals_per_trainval_instance=None,
+        wandb_api_key: Union[None, str] = None,
         seed=0,
         skip_perfect_score=True,
         use_merge=False,
@@ -43,10 +52,10 @@ class GEPA:
         num_examples_per_gepa_step=3,
         max_metric_calls=None,
     ):
-        # Exactly one of max_metric_calls, max_evals_per_trainval_instance or num_iters should be set
-        assert (max_metric_calls is not None) + (max_evals_per_trainval_instance is not None) + (num_iters is not None) == 1, "Exactly one of max_metric_calls, max_evals_per_trainval_instance or num_iters should be set. You set max_metric_calls={}, max_evals_per_trainval_instance={}, num_iters={}".format(
-            max_metric_calls, max_evals_per_trainval_instance, num_iters
-        )   
+        # Exactly one of max_metric_calls or num_iters should be set
+        assert (max_metric_calls is not None) + (num_iters is not None) == 1, "Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={}, num_iters={}".format(
+            max_metric_calls, num_iters
+        )
 
         self.logger = logger
         self.run_dir = run_dir
@@ -70,14 +79,8 @@ class GEPA:
         self.shuffled_trainset_ids = []
         self.epoch = -1
         self.id_freqs = Counter()
-        self.gepa_state: GEPAState = None
 
-        self.eval_and_get_outputs: Callable[[List, Dict[str, str]], Tuple[Any, List[float]]] = None
-        self.capture_traces_and_eval: Callable[[List, Dict[str, str]], Tuple[Any, List[float]]] = None
-        self.extract_reflection_content_from_trajectories: Callable[[Dict[str, str], Any, List[float], List[str]], Dict[str, List[Dict[str, str]]]] = None
-        self.reflect_and_propose_new_text_candidate: Callable[[Dict[str, str], Dict[str, List[Dict[str, str]]], List[str]], Dict[str, str]] = None
-
-    def update_shuffled_trainset(self, original_trainset):
+    def update_shuffled_trainset(self, original_trainset: List):
         self.shuffled_trainset_ids = list(range(len(original_trainset)))
         self.gepa_state.rng1.shuffle(self.shuffled_trainset_ids)
         for id in self.shuffled_trainset_ids:
@@ -117,8 +120,8 @@ class GEPA:
 
     def select_eval_subsample_for_merged_program(
         self,
-        scores1,
-        scores2,
+        scores1: List[float],
+        scores2: List[float],
         rng: random.Random,
         num_subsample_ids: int = 5,
     ) -> List[int]:
@@ -175,7 +178,7 @@ class GEPA:
         self,
         new_program: Dict[str, str],
         gepa_state: GEPAState,
-        valset_evaluator: Callable[[Dict[str, str]], Tuple[Any, List[float]]],
+        valset_evaluator: Callable[[Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
         parent_program_idx: List[int]
     ):
         num_metric_calls_by_discovery_of_new_program = gepa_state.total_num_evals
@@ -220,7 +223,7 @@ class GEPA:
     def select_modules_to_update(
         self,
         gepa_state: GEPAState,
-        trajectories: Any,
+        trajectories: List[Trajectory],
         subsample_scores: List[float],
         curr_prog_idx: int,
         curr_prog: Dict[str, str],
@@ -251,7 +254,7 @@ class GEPA:
             raise ContinueException("All scores are perfect for current program. Skipping reflective mutation.")
 
         if self.use_wandb:
-            import wandb
+            import wandb # type: ignore
             wandb.log({
                 "subsample_score": sum(subsample_scores),
             }, step=gepa_state.i+1)
@@ -288,8 +291,8 @@ class GEPA:
         self,
         gepa_state: GEPAState,
         valset: List,
-        eval_and_get_outputs: Callable[[List, Dict[str, str]], Tuple[Any, List[float]]],
-        valset_evaluator: Callable[[Dict[str, str]], Tuple[Any, List[float]]],
+        eval_and_get_outputs: Callable[[List, Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
+        valset_evaluator: Callable[[Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
         merges_performed: Tuple[List[Tuple[int, int, int]], Any],
         merges_due: int,
         total_merges_tested: int,
@@ -369,8 +372,8 @@ class GEPA:
         base_program: Dict[str, str], 
         trainset: List, 
         # This function is called with list of inputs (from train/val set), and a proposed new program, and returns a tuple of aggregate score, point wise outputs, and point wise scores
-        eval_and_get_outputs: Callable[[List, Dict[str, str]], Tuple[Any, List[float]]],
-        capture_traces_and_eval: Callable[[List, Dict[str, str]], Tuple[Any, List[float]]],
+        eval_and_get_outputs: Callable[[List, Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
+        capture_traces_and_eval: Callable[[List[DataInst], Dict[str, str]], Tuple[List[Trajectory], List[float]]],
         extract_reflection_content_from_trajectories: Callable,
         reflect_and_propose_new_text_candidate: Callable[[Dict[str, str], Dict[str, List[Dict[str, str]]], List[str]], Dict[str, str]],
         valset: Union[List, None] = None,
@@ -404,7 +407,7 @@ class GEPA:
 
         if self.use_wandb:
             # assert gepa_state.i + 1 == 0
-            import wandb
+            import wandb # type: ignore
             wandb.log({
                 "base_program_full_valset_score": gepa_state.program_full_scores_val_set[0],
                 "iteration": gepa_state.i+1,
@@ -454,7 +457,7 @@ class GEPA:
                 self.logger.log(f"Iteration {gepa_state.i+1}: Selected program candidate {curr_prog_id} with base score: {gepa_state.per_program_tracked_scores[curr_prog_id]}")
 
                 if self.use_wandb:
-                    import wandb
+                    import wandb # type: ignore
                     wandb.log({
                         "iteration": gepa_state.i+1,
                         "selected_program_candidate": curr_prog_id,
@@ -488,7 +491,7 @@ class GEPA:
 
                 self.logger.log(f"Iteration {gepa_state.i+1}: New subsample score: {new_subsample_score}")
                 if self.use_wandb:
-                    import wandb
+                    import wandb # type: ignore
                     wandb.log({
                         "new_subsample_score": new_subsample_score,
                     }, step=gepa_state.i+1)

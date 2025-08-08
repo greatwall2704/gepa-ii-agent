@@ -2,13 +2,13 @@ from copy import deepcopy
 import os
 import random
 import json
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .entropy_utils import remove_dominated_programs
 
 class GEPAState:
     program_candidates: List[Dict[str, str]]
-    parent_program_for_candidate: List[List[Union[int, None]]]
+    parent_program_for_candidate: List[List[Optional[int]]]
 
     program_full_scores_val_set: List[float]
 
@@ -120,7 +120,7 @@ class GEPAState:
         # Find the highest predictor id from the parent programs
         max_predictor_id = max([self.named_predictor_id_to_update_next_for_program_candidate[p] for p in parent_program_idx])
         self.named_predictor_id_to_update_next_for_program_candidate.append(max_predictor_id)
-        self.parent_program_for_candidate.append(parent_program_idx)
+        self.parent_program_for_candidate.append([p for p in parent_program_idx])
 
         self.prog_candidate_val_subscores.append(valset_subscores)
         self.program_full_scores_val_set.append(valset_score)
@@ -163,9 +163,9 @@ def write_eval_output_to_directory(
         with open(os.path.join(output_dir, f"task_{task_idx}", f"iter_{0}_prog_0.json"), 'w') as f:
             json.dump(eval_out[1][task_idx], f, indent=4, default=json_default)
 
-def initialize_wandb(wandb_api_key: str = None, run_dir: str = None):
+def initialize_wandb(wandb_api_key: Union[str, None] = None, run_dir: str = None):
     try:
-        import wandb
+        import wandb # type: ignore
         if wandb_api_key:
             wandb.login(key=wandb_api_key, verify=True)
         else:
@@ -183,37 +183,32 @@ def initialize_wandb(wandb_api_key: str = None, run_dir: str = None):
     return wandb_run
 
 def initialize_gepa_state(
-    gepa_state_to_use: Union[GEPAState, None],
     run_dir: str, 
     logger, 
     base_program: Dict[str, str],
     valset_evaluator: Callable[[Dict[str, str]], Tuple[Any, List[float]]],
     seed: int, 
-    run_linearized_gepa: bool,
+    run_linearized_gepa: bool = False,
 ):
-    if gepa_state_to_use is None:
-        if os.path.exists(os.path.join(run_dir, "gepa_state.bin")) and os.path.exists(os.path.join(run_dir, "prog_candidates")):
-            logger.log("Loading gepa state from run dir")
-            gepa_state = GEPAState.load(run_dir)
-        else:
-            num_evals_run = 0
-
-            valset_out = valset_evaluator(base_program)
-            write_eval_output_to_directory(valset_out, os.path.join(run_dir, "generated_best_outputs_valset"))
-            num_evals_run += len(valset_out[1])
-
-            gepa_state = GEPAState(
-                base_program, 
-                valset_out,
-                seed,
-                run_linearized_gepa=run_linearized_gepa,
-            )
-
-            gepa_state.num_full_ds_evals = 1
-            gepa_state.total_num_evals = num_evals_run
-
+    if os.path.exists(os.path.join(run_dir, "gepa_state.bin")) and os.path.exists(os.path.join(run_dir, "prog_candidates")):
+        logger.log("Loading gepa state from run dir")
+        gepa_state = GEPAState.load(run_dir)
     else:
-        gepa_state = gepa_state_to_use
+        num_evals_run = 0
+
+        valset_out = valset_evaluator(base_program)
+        write_eval_output_to_directory(valset_out, os.path.join(run_dir, "generated_best_outputs_valset"))
+        num_evals_run += len(valset_out[1])
+
+        gepa_state = GEPAState(
+            base_program, 
+            valset_out,
+            seed,
+            run_linearized_gepa=run_linearized_gepa,
+        )
+
+        gepa_state.num_full_ds_evals = 1
+        gepa_state.total_num_evals = num_evals_run
 
     return gepa_state
 
@@ -241,7 +236,7 @@ def select_program_candidate_from_pareto_front(pareto_front_programs, train_val_
     curr_prog_id = rng.choice(sampling_list)
     return curr_prog_id
 
-def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAState, valset_score, new_program_idx, valset_subscores, new_instruction, use_wandb, linear_pareto_front_program_idx):
+def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAState, valset_score, new_program_idx, valset_subscores, use_wandb, linear_pareto_front_program_idx):
     best_prog_as_per_agg_score = idxmax(gepa_state.per_program_tracked_scores)
     best_prog_as_per_agg_score_valset = idxmax(gepa_state.program_full_scores_val_set)
 
@@ -263,7 +258,7 @@ def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAS
         "iteration": gepa_state.i+1,
         "full_valset_score": valset_score,
         "full_train_val_score": gepa_state.per_program_tracked_scores[new_program_idx],
-        "new_instruction": new_instruction,
+        # "new_instruction": new_instruction,
         "new_program_idx": new_program_idx,
         "valset_pareto_front_scores": gepa_state.pareto_front_valset,
         "individual_valset_score_new_program": valset_subscores,
@@ -278,5 +273,5 @@ def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAS
     }
 
     if use_wandb:
-        import wandb
+        import wandb # type: ignore
         wandb.log(wandb_logs, step=gepa_state.i+1)

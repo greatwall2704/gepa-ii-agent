@@ -99,7 +99,7 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
                     pred.signature = pred.signature.with_instructions(gepa_candidate[name])
             return new_prog
 
-        def eval_and_get_outputs(inputs: List, proposed_program: Dict[str, str]) -> Tuple[Any, List[float]]:
+        def eval_and_get_outputs(inputs: List[dspy.Example], proposed_program: Dict[str, str]) -> Tuple[Any, List[float]]:
             new_program = create_dspy_prog_from_gepa_candidate(proposed_program)
             
             evaluator = dspy.Evaluate(
@@ -118,7 +118,7 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
             return outputs, per_example_scores
 
         def capture_traces_and_eval(
-            minibatch: List,
+            minibatch: List[dspy.Example],
             curr_prog: Dict[str, str],
         ) -> Tuple[Any, List[float]]:
             """
@@ -262,7 +262,6 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
             perfect_score=self.perfect_score,
             use_wandb=self.use_wandb,
             wandb_api_key=self.wandb_api_key,
-            max_evals_per_trainval_instance=self.max_evals_per_trainval_instance,
             seed=self.seed,
             skip_perfect_score=self.skip_perfect_score,
             use_merge=self.use_merge,
