@@ -211,10 +211,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         self,
         logger: Any,
         trainset: List[DataInst],
-        evaluator: Callable[[List[DataInst], Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
-        capture_traces_and_eval: Callable[[List[DataInst], Dict[str, str]], Tuple[List[Trajectory], List[float]]],
-        extract_reflection_content_from_trajectories: Callable[[Dict[str, str], List[Trajectory], List[float], List[str]], Dict[str, List[Dict[str, str]]]],
-        reflect_and_propose_new_text_candidate: Callable[[Dict[str, str], Dict[str, List[Dict[str, str]]], List[str]], Dict[str, str]],
+        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
         candidate_selector: CandidateSelector,
         module_selector: ModuleSelector,
         batch_sampler: BatchSampler,
@@ -224,10 +221,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
     ):
         self.logger = logger
         self.trainset = trainset
-        self.evaluator = evaluator
-        self.capture_traces_and_eval = capture_traces_and_eval
-        self.extract_reflection_content_from_trajectories = extract_reflection_content_from_trajectories
-        self.reflect_and_propose_new_text_candidate = reflect_and_propose_new_text_candidate
+        self.adapter = adapter
         self.candidate_selector = candidate_selector
         self.module_selector = module_selector
         self.batch_sampler = batch_sampler
@@ -237,97 +231,82 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
 
     def propose(self, state: GEPAState) -> Optional[CandidateProposal]:
         i = state.i + 1
-        # Select candidate
+
         curr_prog_id = self.candidate_selector.select_candidate_idx(state)
         curr_prog = state.program_candidates[curr_prog_id]
         state.full_program_trace[-1]['selected_program_candidate'] = curr_prog_id
-        self.logger.log(f"Iteration {i}: Selected program candidate {curr_prog_id} with base score: {state.per_program_tracked_scores[curr_prog_id]}")
+        self.logger.log(f"Iteration {i}: Selected program {curr_prog_id} score: {state.per_program_tracked_scores[curr_prog_id]}")
 
         if self.use_wandb:
             import wandb  # type: ignore
-            wandb.log({
-                "iteration": i,
-                "selected_program_candidate": curr_prog_id,
-            }, step=i)
+            wandb.log({"iteration": i, "selected_program_candidate": curr_prog_id}, step=i)
 
-        # Select minibatch
         subsample_ids = self.batch_sampler.next_minibatch_indices(len(self.trainset), i-1)
         state.full_program_trace[-1]['subsample_ids'] = subsample_ids
+        minibatch = [self.trainset[j] for j in subsample_ids]
 
-        # Capture trajectories and scores
-        trajectories, subsample_scores = self.capture_traces_and_eval([self.trainset[j] for j in subsample_ids], curr_prog)
-        assert len(trajectories) == len(subsample_scores), "Trajectories and subsample scores must have the same length"
-        if len(trajectories) == 0:
-            self.logger.log(f"Iteration {i}: No trajectories captured for current program {curr_prog_id}. Skipping reflective mutation.")
+        # 1) Evaluate current program with traces
+        eval_curr = self.adapter.evaluate(minibatch, curr_prog, capture_traces=True)
+        if not eval_curr.trajectories or len(eval_curr.trajectories) == 0:
+            self.logger.log(f"Iteration {i}: No trajectories captured. Skipping.")
             return None
 
-        if self.skip_perfect_score and all(s >= self.perfect_score for s in subsample_scores):
-            self.logger.log(f"Iteration {i}: All scores are perfect for current program {curr_prog_id}. Skipping reflective mutation.")
+        state.total_num_evals += len(subsample_ids)
+        state.full_program_trace[-1]['subsample_scores'] = eval_curr.scores
+
+        if self.skip_perfect_score and all(s >= self.perfect_score for s in eval_curr.scores):
+            self.logger.log(f"Iteration {i}: All subsample scores perfect. Skipping.")
             return None
 
         if self.use_wandb:
             import wandb  # type: ignore
-            wandb.log({"subsample_score": sum(subsample_scores)}, step=i)
-        
-        state.total_num_evals += len(subsample_ids)
+            wandb.log({"subsample_score": sum(eval_curr.scores)}, step=i)
 
-        state.full_program_trace[-1]['subsample_scores'] = subsample_scores
-
-        # Select module(s) to update
+        # 2) Decide which predictors to update
         predictor_names_to_update = self.module_selector.select_modules(
-            state, trajectories, subsample_scores, curr_prog_id, curr_prog
+            state, eval_curr.trajectories, eval_curr.scores, curr_prog_id, curr_prog
         )
 
-        # Build reflective dataset
+        # 3) Build reflective dataset and propose texts
         try:
-            reflective_dataset = self.extract_reflection_content_from_trajectories(
-                curr_prog,
-                trajectories,
-                subsample_scores,
-                predictor_names_to_update
+            reflective_dataset = self.adapter.make_reflective_dataset(
+                curr_prog, eval_curr, predictor_names_to_update
             )
-            new_texts = self.reflect_and_propose_new_text_candidate(
-                curr_prog,
-                reflective_dataset,
-                predictor_names_to_update,
+            new_texts = self.adapter.propose_new_texts(
+                curr_prog, reflective_dataset, predictor_names_to_update
             )
             for pname, text in new_texts.items():
                 self.logger.log(f"Iteration {i}: Proposed new text for {pname}: {text}")
-            
             if self.use_wandb:
                 import wandb  # type: ignore
                 wandb.log({f"new_instruction_{pname}": text for pname, text in new_texts.items()}, step=i)
         except Exception as e:
             self.logger.log(f"Iteration {i}: Exception during reflection/proposal: {e}")
+            import traceback
             self.logger.log(traceback.format_exc())
             return None
 
-        # Create new candidate
+        # 4) Create candidate, evaluate on same minibatch (no need to capture traces)
         new_candidate = curr_prog.copy()
         for pname, text in new_texts.items():
-            assert pname in new_candidate, f"Predictor {pname} not found in current program"
+            assert pname in new_candidate, f"{pname} missing in candidate"
             new_candidate[pname] = text
 
-        # Evaluate new candidate on the same minibatch
-        subsample_evaluator = lambda prog: self.evaluator([self.trainset[k] for k in subsample_ids], prog)
-        _, new_subsample_scores = subsample_evaluator(new_candidate)
+        eval_new = self.adapter.evaluate(minibatch, new_candidate, capture_traces=False)
         state.total_num_evals += len(subsample_ids)
-        state.full_program_trace[-1]['new_subsample_scores'] = new_subsample_scores
+        state.full_program_trace[-1]['new_subsample_scores'] = eval_new.scores
 
-        new_sum = sum(new_subsample_scores)
-        old_sum = sum(subsample_scores)
-        self.logger.log(f"Iteration {i}: New subsample score: {new_sum}")
+        new_sum = sum(eval_new.scores)
         if self.use_wandb:
             import wandb  # type: ignore
             wandb.log({"new_subsample_score": new_sum}, step=i)
 
-        # Acceptance is evaluated by engine; we just return the proposal
         return CandidateProposal(
             candidate=new_candidate,
             parent_program_ids=[curr_prog_id],
             subsample_indices=subsample_ids,
-            subsample_scores_before=subsample_scores,
-            subsample_scores_after=new_subsample_scores,
+            subsample_scores_before=eval_curr.scores,
+            subsample_scores_after=eval_new.scores,
             tag="reflective_mutation",
         )
 
@@ -716,39 +695,25 @@ class GEPA(Generic[DataInst, Trajectory, RolloutOutput]):
         # Will be set on .gepa()
         self.gepa_state: Optional[GEPAState] = None
 
-    def gepa(
+    def optimize(
         self,
         base_program: Dict[str, str],
         trainset: List[DataInst],
-        eval_and_get_outputs: Callable[[List[DataInst], Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
-        capture_traces_and_eval: Callable[[List[DataInst], Dict[str, str]], Tuple[List[Trajectory], List[float]]],
-        extract_reflection_content_from_trajectories: Callable[[Dict[str, str], List[Trajectory], List[float], List[str]], Dict[str, List[Dict[str, str]]]],
-        reflect_and_propose_new_text_candidate: Callable[[Dict[str, str], Dict[str, List[Dict[str, str]]], List[str]], Dict[str, str]],
+        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
         valset: Optional[List[DataInst]] = None,
     ) -> GEPAState:
-        # Default to trainset if valset not given (same as before)
         if valset is None:
             valset = trainset
 
-        # Build default strategies mirroring old behavior
         rng = random.Random(self.seed)
-        if self.candidate_selection_strategy == "current_best":
-            candidate_selector = CurrentBestCandidateSelector()
-        elif self.candidate_selection_strategy == "pareto":
-            candidate_selector = ParetoCandidateSelector(rng=rng)
-        else:
-            raise ValueError(f"Invalid candidate_selection_strategy: {self.candidate_selection_strategy}")
-
+        candidate_selector = ParetoCandidateSelector(rng=rng) if self.candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
         module_selector = RoundRobinModuleSelector()
         batch_sampler = EpochShuffledBatchSampler(minibatch_size=self.num_examples_per_gepa_step, rng=rng)
 
         reflective_proposer = ReflectiveMutationProposer(
             logger=self.logger,
             trainset=trainset,
-            evaluator=eval_and_get_outputs,
-            capture_traces_and_eval=capture_traces_and_eval,
-            extract_reflection_content_from_trajectories=extract_reflection_content_from_trajectories,
-            reflect_and_propose_new_text_candidate=reflect_and_propose_new_text_candidate,
+            adapter=adapter,
             candidate_selector=candidate_selector,
             module_selector=module_selector,
             batch_sampler=batch_sampler,
@@ -759,10 +724,14 @@ class GEPA(Generic[DataInst, Trajectory, RolloutOutput]):
 
         merge_proposer = None
         if self.use_merge:
+            def evaluator(inputs, prog):
+                eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
+                return eval_out.outputs, eval_out.scores
+
             merge_proposer = MergeProposer(
                 logger=self.logger,
                 valset=valset,
-                evaluator=eval_and_get_outputs,
+                evaluator=evaluator,
                 use_merge=self.use_merge,
                 max_merge_invocations=self.max_merge_invocations,
                 rng=rng,
@@ -771,7 +740,8 @@ class GEPA(Generic[DataInst, Trajectory, RolloutOutput]):
         engine = GEPAEngine(
             logger=self.logger,
             run_dir=self.run_dir,
-            evaluator=eval_and_get_outputs,
+            evaluator=lambda inputs, prog: (adapter.evaluate(inputs, prog, capture_traces=False).outputs,
+                                            adapter.evaluate(inputs, prog, capture_traces=False).scores),
             valset=valset,
             base_program=base_program,
             num_iters=self.num_iters,
@@ -783,7 +753,6 @@ class GEPA(Generic[DataInst, Trajectory, RolloutOutput]):
             reflective_proposer=reflective_proposer,
             merge_proposer=merge_proposer,
         )
-
         state = engine.run()
         self.gepa_state = state
         return state
