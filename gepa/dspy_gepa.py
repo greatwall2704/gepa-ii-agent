@@ -129,14 +129,47 @@ class DspyAdapter(GEPAAdapter):
                 inputs = selected[1]
                 outputs = selected[2]
 
-                d = {"inputs": inputs, "outputs": outputs}
+                new_inputs = {}
+                new_outputs = {}
+
+                contains_history = False
+                history_key_name = None
+                for input_key, input_val in inputs.items():
+                    if isinstance(input_val, dspy.History):
+                        contains_history = True
+                        assert history_key_name is None
+                        history_key_name = input_key
+                
+                if contains_history:
+                    s = "```json\n"
+                    for i, message in enumerate(inputs[history_key_name].messages):
+                        s += f"  {i}: {message}\n"
+                    s += "```"
+                    new_inputs["Context"] = s
+                
+                for input_key, input_val in inputs.items():
+                    if contains_history and input_key == history_key_name:
+                        continue
+                    new_inputs[input_key] = str(input_val)
+                
+                if isinstance(outputs, FailedPrediction):
+                    s = "Couldn't parse the output as per the expected output format. The model's raw response was:\n"
+                    s += "```\n"
+                    s += outputs.completion_text + "\n"
+                    s += "```\n\n"
+                    new_outputs = s
+                else:
+                    for output_key, output_val in outputs.items():
+                        new_outputs[output_key] = str(output_val)
+
+                d = {"Inputs": new_inputs, "Generated Outputs": new_outputs}
                 if isinstance(outputs, FailedPrediction):
                     adapter = dspy.ChatAdapter()
                     structure_instruction = ""
                     for dd in adapter.format(module.signature, [], {}):
                         structure_instruction += dd["role"] + ": " + dd["content"] + "\n"
-                    d['feedback'] = "Your output failed to parse. Follow this structure:\n" + structure_instruction
-                    d['score'] = self.failure_score
+                    d['Feedback'] = "Your output failed to parse. Follow this structure:\n" + structure_instruction
+                    # d['score'] = self.failure_score
                 else:
                     fb = feedback_fn(
                         predictor_output=outputs,
@@ -145,8 +178,8 @@ class DspyAdapter(GEPAAdapter):
                         module_outputs=prediction,
                         captured_trace=trace,
                     )
-                    d['feedback'] = fb["feedback_text"]
-                    d['score'] = fb["feedback_score"]
+                    d['Feedback'] = fb["feedback_text"]
+                    # d['score'] = fb["feedback_score"]
                 items.append(d)
 
             if len(items) == 0:
@@ -165,12 +198,11 @@ class DspyAdapter(GEPAAdapter):
         for name in predictors_to_update:
             base_instruction = candidate[name]
             dataset_with_feedback = reflective_dataset[name]
-            m = ProposeNewInstructionModule(
+            new_texts[name] = ProposeNewInstructionModule(
                 base_instruction=base_instruction,
                 instruction_lm=self.teacher_lm,
                 dataset_with_feedback=dataset_with_feedback
             )
-            new_texts[name] = m.compile()
         return new_texts
 
 class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
