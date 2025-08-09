@@ -305,7 +305,6 @@ def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAS
         "iteration": gepa_state.i+1,
         "full_valset_score": valset_score,
         "full_train_val_score": gepa_state.per_program_tracked_scores[new_program_idx],
-        # "new_instruction": new_instruction,
         "new_program_idx": new_program_idx,
         "valset_pareto_front_scores": gepa_state.pareto_front_valset,
         "individual_valset_score_new_program": valset_subscores,

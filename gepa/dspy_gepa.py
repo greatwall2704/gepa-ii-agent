@@ -113,7 +113,10 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
                 max_errors=len(inputs) * 100  # Allow for many errors
             )
 
-            aggregate_score, outputs, per_example_scores = evaluator(new_program)
+            evaluation_result = evaluator(new_program)
+            aggregate_score = evaluation_result.score
+            outputs = [r[1] for r in evaluation_result.results]
+            per_example_scores = [r[2] for r in evaluation_result.results]
 
             return outputs, per_example_scores
 
@@ -257,7 +260,7 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
         gepa_obj = GEPA(
             logger=self.logger,
             run_dir=self.run_dir,
-            run_linearized_gepa=self.run_linearized_gepa,
+            candidate_selection_strategy="pareto",
             num_iters=self.num_iters,
             perfect_score=self.perfect_score,
             use_wandb=self.use_wandb,
