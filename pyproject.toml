@@ -2,6 +2,7 @@
 name = "gepa"
 version = "0.0.1"
 description = "GEPA is a novel prompt optimizers that uses text feedback to improve compound AI systems."
+readme = "README.md"
 authors = [
   { name = "Lakshya A Agrawal", email = "lakshyaaagrawal@berkeley.edu" }
 ]
