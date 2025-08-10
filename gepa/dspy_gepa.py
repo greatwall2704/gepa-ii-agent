@@ -21,7 +21,6 @@ class DspyAdapter(GEPAAdapter):
         student_module,
         metric_fn: Callable,
         feedback_map: Dict[str, Callable],
-        teacher_lm=None,
         failure_score=0.0,
         num_threads: Optional[int] = None,
         add_format_failure_as_feedback: bool = False,
@@ -31,7 +30,6 @@ class DspyAdapter(GEPAAdapter):
         self.student = student_module
         self.metric_fn = metric_fn
         self.feedback_map = feedback_map
-        self.teacher_lm = teacher_lm or dspy.settings.lm or student_module.get_lm()
         self.failure_score = failure_score
         self.num_threads = num_threads or os.cpu_count()
         self.add_format_failure_as_feedback = add_format_failure_as_feedback
@@ -53,7 +51,7 @@ class DspyAdapter(GEPAAdapter):
 
         if capture_traces:
             # bootstrap_trace_data-like flow with trace capture
-            from dspy.teleprompt.bootstrap_finetune import bootstrap_trace_data, FailedPrediction
+            from dspy.teleprompt.bootstrap_finetune import bootstrap_trace_data
             trajs = bootstrap_trace_data(
                 program=program,
                 dataset=batch,
@@ -89,13 +87,13 @@ class DspyAdapter(GEPAAdapter):
             scores = [r[2] for r in res.results]
             return EvaluationBatch(outputs=outputs, scores=scores, trajectories=None)
 
-    def make_reflective_dataset(self, candidate, eval_batch, predictors_to_update):
+    def make_reflective_dataset(self, candidate, eval_batch, components_to_update):
         import dspy
         from dspy.teleprompt.bootstrap_finetune import FailedPrediction
         program = self.build_program(candidate)
 
         ret_d: Dict[str, List[Dict[str, Any]]] = {}
-        for pred_name in predictors_to_update:
+        for pred_name in components_to_update:
             feedback_fn = self.feedback_map[pred_name]
             module = None
             for name, m in program.named_predictors():
@@ -121,6 +119,7 @@ class DspyAdapter(GEPAAdapter):
                     if isinstance(t[2], FailedPrediction):
                         selected = t
                         break
+
                 if selected is None:
                     if isinstance(prediction, FailedPrediction):
                         continue
@@ -151,7 +150,7 @@ class DspyAdapter(GEPAAdapter):
                     if contains_history and input_key == history_key_name:
                         continue
                     new_inputs[input_key] = str(input_val)
-                
+
                 if isinstance(outputs, FailedPrediction):
                     s = "Couldn't parse the output as per the expected output format. The model's raw response was:\n"
                     s += "```\n"
@@ -191,19 +190,6 @@ class DspyAdapter(GEPAAdapter):
             raise Exception(f"No valid predictions found for any module.")
 
         return ret_d
-
-    def propose_new_texts(self, candidate, reflective_dataset, predictors_to_update):
-        from .instruction_proposal import ProposeNewInstructionModule
-        new_texts: Dict[str, str] = {}
-        for name in predictors_to_update:
-            base_instruction = candidate[name]
-            dataset_with_feedback = reflective_dataset[name]
-            new_texts[name] = ProposeNewInstructionModule(
-                base_instruction=base_instruction,
-                instruction_lm=self.teacher_lm,
-                dataset_with_feedback=dataset_with_feedback
-            )
-        return new_texts
 
 class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
     def __init__(
@@ -308,7 +294,6 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
             student_module=student,
             metric_fn=self.metric_fn,
             feedback_map=self.named_predictor_to_feedback_fn_map,
-            teacher_lm=self.teacher_lm or dspy.settings.lm or student.get_lm(),
             failure_score=self.failure_score,
             num_threads=self.num_threads,
             add_format_failure_as_feedback=self.add_format_failure_as_feedback,
@@ -318,10 +303,13 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
         # Prepare engine budgets
         budgets = self._resolve_budget(train_n=len(trainset), val_n=len(valset))
 
+        teacher_lm = lambda x: (self.teacher_lm or dspy.settings.lm or student.get_lm())(x)[0]
+
         # Instantiate GEPA with the simpler adapter-based API
         gepa_obj = GEPA(
             logger=self.logger,
             run_dir=self.run_dir,
+            teacher_lm=teacher_lm,
             candidate_selection_strategy="pareto",
             num_iters=budgets["num_iters"],
             perfect_score=self.perfect_score,

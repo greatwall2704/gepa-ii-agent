@@ -1,6 +1,4 @@
-from copy import deepcopy
 import os
-import random
 import json
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -25,8 +23,6 @@ class GEPAState:
     num_metric_calls_by_discovery: List[int]
 
     running_linearized_gepa: bool
-
-    rng1: random.Random
 
     full_program_trace: List
 
@@ -54,7 +50,6 @@ class GEPAState:
         self.list_of_named_predictors = list(base_program.keys())
         self.named_predictor_id_to_update_next_for_program_candidate = [0]
         self.i = -1
-        self.rng1 = random.Random(seed)
 
         self.prog_candidate_val_subscores = [base_valset_eval_output[1]]
         self.num_metric_calls_by_discovery = [0]
