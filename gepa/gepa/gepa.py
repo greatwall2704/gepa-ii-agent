@@ -6,6 +6,7 @@ from typing import Any, Dict, Generic, List, Optional, Protocol, Tuple, TypeVar,
 
 from collections import Counter
 
+from .gepa_result import GEPAResult
 from .instruction_proposal import LanguageModel
 
 from .gepa_utils import (
@@ -592,7 +593,6 @@ class MergeProposer(ProposeNewCandidate):
             metadata={"ancestor": ancestor}
         )
 
-
 # =========================
 # Engine
 # =========================
@@ -858,12 +858,15 @@ def optimize(
             max_merge_invocations=max_merge_invocations,
             rng=rng,
         )
+    
+    def full_eval(inputs, prog):
+        eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
+        return eval_out.outputs, eval_out.scores
 
     engine = GEPAEngine(
         logger=logger,
         run_dir=run_dir,
-        evaluator=lambda inputs, prog: (adapter.evaluate(inputs, prog, capture_traces=False).outputs,
-                                        adapter.evaluate(inputs, prog, capture_traces=False).scores),
+        evaluator=full_eval,
         valset=valset,
         base_program=base_program,
         num_iters=num_iters,
@@ -876,4 +879,5 @@ def optimize(
         merge_proposer=merge_proposer,
     )
     state = engine.run()
-    return state
+    result = GEPAResult.from_state(state)
+    return result

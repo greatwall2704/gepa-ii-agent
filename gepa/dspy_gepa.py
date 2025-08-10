@@ -1,5 +1,6 @@
+from dataclasses import dataclass
 import os
-from typing import Any, Dict, Optional, Callable
+from typing import Any, Dict, Optional, Callable, Set
 import dspy
 import random
 
@@ -8,12 +9,85 @@ import dspy.teleprompt.teleprompt
 
 from typing import List
 
-from gepa.gepa.gepa import GEPAAdapter, EvaluationBatch, optimize
+from gepa.gepa.gepa import GEPAAdapter, EvaluationBatch, optimize, GEPAResult
 
-def idxmax(lst):
-    """Return the index of the maximum value in a list."""
-    max_val = max(lst)
-    return lst.index(max_val)
+@dataclass(frozen=True)
+class DspyGEPAResult:
+    """
+    Additional data related to the GEPA run.
+
+    Fields:
+    - candidates: list of proposed candidates (component_name -> component_text)
+    - parents: lineage info; for each candidate i, parents[i] is a list of parent indices or None
+    - val_aggregate_scores: per-candidate aggregate score on the validation set (higher is better)
+    - val_subscores: per-candidate per-instance scores on the validation set (len == num_val_instances)
+    - per_val_instance_best_candidates: for each val instance t, a set of candidate indices achieving the current best score on t
+    - discovery_eval_counts: number of metric calls accumulated up to the discovery of each candidate
+
+    - total_metric_calls: total number of metric calls made across the run
+    - num_full_val_evals: number of full validation evaluations performed
+    - run_dir: where artifacts were written (if any)
+    - seed: RNG seed for reproducibility (if known)
+
+    - best_idx: candidate index with the highest val_aggregate_scores
+    - best_candidate: the program text mapping for best_idx
+    """
+    # Core data
+    candidates: List[dspy.Module]
+    parents: List[List[Optional[int]]]
+    val_aggregate_scores: List[float]
+    val_subscores: List[List[float]]
+    per_val_instance_best_candidates: List[Set[int]]
+    discovery_eval_counts: List[int]
+
+    # Run metadata (optional)
+    total_metric_calls: Optional[int] = None
+    num_full_val_evals: Optional[int] = None
+    run_dir: Optional[str] = None
+    seed: Optional[int] = None
+
+    @property
+    def best_idx(self) -> int:
+        scores = self.val_aggregate_scores
+        return max(range(len(scores)), key=lambda i: scores[i])
+
+    @property
+    def best_candidate(self) -> Dict[str, str]:
+        return self.candidates[self.best_idx]
+
+    def to_dict(self) -> Dict[str, Any]:
+        cands = [
+            {k: v for k, v in cand.items()}
+            for cand in self.candidates
+        ]
+
+        return dict(
+            candidates=cands,
+            parents=self.parents,
+            val_aggregate_scores=self.val_aggregate_scores,
+            val_subscores=self.val_subscores,
+            per_val_instance_best_candidates=[list(s) for s in self.per_val_instance_best_candidates],
+            discovery_eval_counts=self.discovery_eval_counts,
+            total_metric_calls=self.total_metric_calls,
+            num_full_val_evals=self.num_full_val_evals,
+            run_dir=self.run_dir,
+            seed=self.seed,
+            best_idx=self.best_idx,
+        )
+
+    def from_gepa_result(gepa_result: GEPAResult, adapter: "DspyAdapter") -> "DspyGEPAResult":
+        return DspyGEPAResult(
+            candidates=[adapter.build_program(c) for c in gepa_result.candidates],
+            parents=gepa_result.parents,
+            val_aggregate_scores=gepa_result.val_aggregate_scores,
+            val_subscores=gepa_result.val_subscores,
+            per_val_instance_best_candidates=gepa_result.per_val_instance_best_candidates,
+            discovery_eval_counts=gepa_result.discovery_eval_counts,
+            total_metric_calls=gepa_result.total_metric_calls,
+            num_full_val_evals=gepa_result.num_full_val_evals,
+            run_dir=gepa_result.run_dir,
+            seed=gepa_result.seed,
+        )
 
 class DspyAdapter(GEPAAdapter):
     def __init__(
@@ -214,6 +288,7 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
         num_dspy_examples_per_gepa_step: int = 3,
         max_metric_calls: Optional[int] = None,
         add_format_failure_as_feedback: bool = False,
+        track_stats: bool = False,
     ):
         # Exactly one of the three budget controls must be provided
         assert (
@@ -252,9 +327,9 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
 
         self.num_dspy_examples_per_gepa_step = num_dspy_examples_per_gepa_step
         self.add_format_failure_as_feedback = add_format_failure_as_feedback
+        self.track_stats = track_stats
 
         self._rng = random.Random(seed)
-        self.gepa_state = None  # populated after compile
 
     def _resolve_budget(self, train_n: int, val_n: int) -> Dict[str, Optional[int]]:
         """
@@ -287,6 +362,8 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
         **kwargs,
     ) -> dspy.Module:
         assert trainset is not None and len(trainset) > 0, "Trainset must be provided and non-empty"
+        assert teacher is None, "Teacher is not supported in DspyGEPA yet."
+
         valset = valset or trainset
 
         # Build the DSPy adapter that encapsulates evaluation, trace capture, feedback extraction, and instruction proposal
@@ -307,7 +384,7 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
 
         # Instantiate GEPA with the simpler adapter-based API
         base_program = {name: pred.signature.instructions for name, pred in student.named_predictors()}
-        self.gepa_state = optimize(
+        gepa_result: GEPAResult = optimize(
             base_program=base_program,
             trainset=trainset,
             adapter=adapter,
@@ -328,13 +405,10 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
             max_metric_calls=budgets["max_metric_calls"],
         )
 
-        # Construct a new student with best found instructions
-        best_idx = idxmax(self.gepa_state.per_program_tracked_scores)
-        new_prog = student.deepcopy()
-        for name, pred in new_prog.named_predictors():
-            if name in self.gepa_state.program_candidates[best_idx]:
-                pred.signature = pred.signature.with_instructions(
-                    self.gepa_state.program_candidates[best_idx][name]
-                )
+        new_prog = adapter.build_program(gepa_result.best_candidate)
+
+        if self.track_stats:
+            dspy_gepa_result = DspyGEPAResult.from_gepa_result(gepa_result, adapter)
+            setattr(new_prog, "dspy_gepa_result", dspy_gepa_result)
 
         return new_prog
