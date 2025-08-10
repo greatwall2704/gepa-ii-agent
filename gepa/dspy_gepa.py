@@ -8,7 +8,7 @@ import dspy.teleprompt.teleprompt
 
 from typing import List
 
-from gepa.gepa.gepa import GEPA, GEPAAdapter, EvaluationBatch
+from gepa.gepa.gepa import GEPAAdapter, EvaluationBatch, optimize
 
 def idxmax(lst):
     """Return the index of the maximum value in a list."""
@@ -306,7 +306,12 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
         teacher_lm = lambda x: (self.teacher_lm or dspy.settings.lm or student.get_lm())(x)[0]
 
         # Instantiate GEPA with the simpler adapter-based API
-        gepa_obj = GEPA(
+        base_program = {name: pred.signature.instructions for name, pred in student.named_predictors()}
+        self.gepa_state = optimize(
+            base_program=base_program,
+            trainset=trainset,
+            adapter=adapter,
+            valset=valset,
             logger=self.logger,
             run_dir=self.run_dir,
             teacher_lm=teacher_lm,
@@ -321,16 +326,6 @@ class dspy_GEPA(dspy.teleprompt.teleprompt.Teleprompter):
             max_merge_invocations=self.max_merge_invocations,
             num_examples_per_gepa_step=self.num_dspy_examples_per_gepa_step,
             max_metric_calls=budgets["max_metric_calls"],
-        )
-
-        base_program = {name: pred.signature.instructions for name, pred in student.named_predictors()}
-
-        # Run optimization
-        self.gepa_state = gepa_obj.optimize(
-            base_program=base_program,
-            trainset=trainset,
-            adapter=adapter,
-            valset=valset,
         )
 
         # Construct a new student with best found instructions

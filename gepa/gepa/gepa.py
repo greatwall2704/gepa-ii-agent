@@ -799,116 +799,81 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         state.save(self.run_dir)
         return state
 
-# =========================
-# Backward-compatible Wrapper
-# =========================
+def optimize(
+    base_program: Dict[str, str],
+    trainset: List[DataInst],
+    adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
+    logger,
+    run_dir: str,
+    teacher_lm: LanguageModel,
+    valset: Optional[List[DataInst]] = None,
+    candidate_selection_strategy: str = "pareto",
+    num_iters=None,
+    perfect_score=1,
+    use_wandb: bool = False,
+    wandb_api_key: Optional[str] = None,
+    seed=0,
+    skip_perfect_score=True,
+    use_merge=False,
+    max_merge_invocations=5,
+    num_examples_per_gepa_step=3,
+    max_metric_calls=None,
+):
 
-class GEPA(Generic[DataInst, Trajectory, RolloutOutput]):
-    """
-    Backward compatible wrapper exposing the same public API (.gepa) as your original class.
-    Internally builds the new engine and default strategies to preserve behavior.
-    """
-    def __init__(
-        self,
-        logger,
-        run_dir: str,
-        teacher_lm: LanguageModel,
-        candidate_selection_strategy: str = "pareto",
-        num_iters=None,
-        perfect_score=1,
-        use_wandb: bool = False,
-        wandb_api_key: Optional[str] = None,
-        seed=0,
-        skip_perfect_score=True,
-        use_merge=False,
-        max_merge_invocations=5,
-        num_examples_per_gepa_step=3,
-        max_metric_calls=None,
-    ):
-        assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
-            f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
+    assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
+        f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
 
-        self.logger = logger
-        self.run_dir = run_dir
-        self.candidate_selection_strategy = candidate_selection_strategy
-        self.teacher_lm = teacher_lm
+    if valset is None:
+        valset = trainset
 
-        self.perfect_score = perfect_score
-        self.use_wandb = use_wandb
-        self.wandb_api_key = wandb_api_key
+    rng = random.Random(seed)
+    candidate_selector = ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
+    module_selector = RoundRobinModuleSelector()
+    batch_sampler = EpochShuffledBatchSampler(minibatch_size=num_examples_per_gepa_step, rng=rng)
 
-        self.num_iters = num_iters
-        self.max_metric_calls = max_metric_calls
+    reflective_proposer = ReflectiveMutationProposer(
+        logger=logger,
+        trainset=trainset,
+        adapter=adapter,
+        candidate_selector=candidate_selector,
+        module_selector=module_selector,
+        batch_sampler=batch_sampler,
+        perfect_score=perfect_score,
+        skip_perfect_score=skip_perfect_score,
+        use_wandb=use_wandb,
+        teacher_lm=teacher_lm,
+    )
 
-        self.seed = seed
-        self.skip_perfect_score = skip_perfect_score
-        self.use_merge = use_merge
-        self.max_merge_invocations = max_merge_invocations
+    merge_proposer = None
+    if use_merge:
+        def evaluator(inputs, prog):
+            eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
+            return eval_out.outputs, eval_out.scores
 
-        self.num_examples_per_gepa_step = num_examples_per_gepa_step
-
-        # Will be set on .gepa()
-        self.gepa_state: Optional[GEPAState] = None
-
-    def optimize(
-        self,
-        base_program: Dict[str, str],
-        trainset: List[DataInst],
-        adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
-        valset: Optional[List[DataInst]] = None,
-    ) -> GEPAState:
-        if valset is None:
-            valset = trainset
-
-        rng = random.Random(self.seed)
-        candidate_selector = ParetoCandidateSelector(rng=rng) if self.candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
-        module_selector = RoundRobinModuleSelector()
-        batch_sampler = EpochShuffledBatchSampler(minibatch_size=self.num_examples_per_gepa_step, rng=rng)
-
-        reflective_proposer = ReflectiveMutationProposer(
-            logger=self.logger,
-            trainset=trainset,
-            adapter=adapter,
-            candidate_selector=candidate_selector,
-            module_selector=module_selector,
-            batch_sampler=batch_sampler,
-            perfect_score=self.perfect_score,
-            skip_perfect_score=self.skip_perfect_score,
-            use_wandb=self.use_wandb,
-            teacher_lm=self.teacher_lm,
-        )
-
-        merge_proposer = None
-        if self.use_merge:
-            def evaluator(inputs, prog):
-                eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
-                return eval_out.outputs, eval_out.scores
-
-            merge_proposer = MergeProposer(
-                logger=self.logger,
-                valset=valset,
-                evaluator=evaluator,
-                use_merge=self.use_merge,
-                max_merge_invocations=self.max_merge_invocations,
-                rng=rng,
-            )
-
-        engine = GEPAEngine(
-            logger=self.logger,
-            run_dir=self.run_dir,
-            evaluator=lambda inputs, prog: (adapter.evaluate(inputs, prog, capture_traces=False).outputs,
-                                            adapter.evaluate(inputs, prog, capture_traces=False).scores),
+        merge_proposer = MergeProposer(
+            logger=logger,
             valset=valset,
-            base_program=base_program,
-            num_iters=self.num_iters,
-            max_metric_calls=self.max_metric_calls,
-            perfect_score=self.perfect_score,
-            use_wandb=self.use_wandb,
-            wandb_api_key=self.wandb_api_key,
-            seed=self.seed,
-            reflective_proposer=reflective_proposer,
-            merge_proposer=merge_proposer,
+            evaluator=evaluator,
+            use_merge=use_merge,
+            max_merge_invocations=max_merge_invocations,
+            rng=rng,
         )
-        state = engine.run()
-        self.gepa_state = state
-        return state
+
+    engine = GEPAEngine(
+        logger=logger,
+        run_dir=run_dir,
+        evaluator=lambda inputs, prog: (adapter.evaluate(inputs, prog, capture_traces=False).outputs,
+                                        adapter.evaluate(inputs, prog, capture_traces=False).scores),
+        valset=valset,
+        base_program=base_program,
+        num_iters=num_iters,
+        max_metric_calls=max_metric_calls,
+        perfect_score=perfect_score,
+        use_wandb=use_wandb,
+        wandb_api_key=wandb_api_key,
+        seed=seed,
+        reflective_proposer=reflective_proposer,
+        merge_proposer=merge_proposer,
+    )
+    state = engine.run()
+    return state
