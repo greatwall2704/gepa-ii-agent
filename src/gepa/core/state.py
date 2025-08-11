@@ -1,9 +1,10 @@
-from typing import Any, Dict, List, Optional, Callable, Tuple
+from typing import Any, Dict, Generic, List, Optional, Callable, Sequence, Set, Tuple
 import os
 import json
 from gepa.gepa_utils import idxmax, json_default
+from gepa.core.adapter import RolloutOutput
 
-class GEPAState:
+class GEPAState(Generic[RolloutOutput]):
     program_candidates: List[Dict[str, str]]
     parent_program_for_candidate: List[List[Optional[int]]]
 
@@ -27,11 +28,13 @@ class GEPAState:
 
     per_program_tracked_scores: List[float]
 
+    best_outputs_valset: Optional[List[Tuple[int, List[RolloutOutput]]]] = None
+
     def __init__(
         self, 
         seed_candidate: Dict[str, str],
-        base_valset_eval_output: tuple[Any, List[float]],
-        seed: int, 
+        base_valset_eval_output: tuple[List[RolloutOutput], List[float]],
+        track_best_outputs: bool = False,
     ):
         valset_base_score = sum(base_valset_eval_output[1]) / len(base_valset_eval_output[1])
         base_valset_pareto_front = base_valset_eval_output[1]
@@ -51,6 +54,10 @@ class GEPAState:
 
         self.prog_candidate_val_subscores = [base_valset_eval_output[1]]
         self.num_metric_calls_by_discovery = [0]
+
+        if track_best_outputs:
+            # [(program_idx_1, output_1), (program_idx_2, output_2), ...]
+            self.best_outputs_valset = [[(0, output)] for output in base_valset_eval_output[0]]
 
         self.full_program_trace = []
 
@@ -73,7 +80,6 @@ class GEPAState:
     def save(self, run_dir: Optional[str]):
         if run_dir is None:
             return
-        # Save all the other state except programs as pickle
         with open(os.path.join(run_dir, "gepa_state.bin"), 'wb') as f:
             import pickle
             d = {k: v for k, v in self.__dict__.items()}
@@ -119,12 +125,18 @@ class GEPAState:
             if new_score > old_score:
                 self.pareto_front_valset[task_idx] = new_score
                 self.program_at_pareto_front_valset[task_idx] = {new_program_idx}
+                
+                if self.best_outputs_valset is not None:
+                    self.best_outputs_valset[task_idx] = [(new_program_idx, valset_outputs[task_idx])]
+
                 if run_dir is not None:
                     os.makedirs(os.path.join(run_dir, "generated_best_outputs_valset", f"task_{task_idx}"), exist_ok=True)
                     with open(os.path.join(run_dir, "generated_best_outputs_valset", f"task_{task_idx}", f"iter_{self.i+1}_prog_{new_program_idx}.json"), 'w') as f:
                         json.dump(valset_outputs[task_idx], f, indent=4, default=json_default)
             elif new_score == old_score:
                 self.program_at_pareto_front_valset[task_idx].add(new_program_idx)
+                if self.best_outputs_valset is not None:
+                    self.best_outputs_valset[task_idx].append((new_program_idx, valset_outputs[task_idx]))
 
         assert len(valset_subscores) == len(self.program_at_pareto_front_valset)
 
@@ -135,7 +147,7 @@ class GEPAState:
         return new_program_idx, linear_pareto_front_program_idx
 
 def write_eval_output_to_directory(
-    eval_out: Tuple[Any, List[float]], 
+    eval_out: Tuple[List[RolloutOutput], List[float]], 
     output_dir: str
 ):
     for task_idx, score in enumerate(eval_out[1]):
@@ -147,8 +159,8 @@ def initialize_gepa_state(
     run_dir: Optional[str], 
     logger, 
     seed_candidate: Dict[str, str],
-    valset_evaluator: Callable[[Dict[str, str]], Tuple[Any, List[float]]],
-    seed: int,
+    valset_evaluator: Callable[[Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
+    track_best_outputs: bool = False,
 ):
     if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")) and os.path.exists(os.path.join(run_dir, "prog_candidates")):
         logger.log("Loading gepa state from run dir")
@@ -164,7 +176,7 @@ def initialize_gepa_state(
         gepa_state = GEPAState(
             seed_candidate, 
             valset_out,
-            seed,
+            track_best_outputs=track_best_outputs,
         )
 
         gepa_state.num_full_ds_evals = 1

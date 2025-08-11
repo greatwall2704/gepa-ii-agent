@@ -31,6 +31,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         use_wandb: bool = False,
         wandb_api_key: Optional[str] = None,
         wandb_init_kwargs: Optional[Dict[str, Any]] = None,
+        track_best_outputs: bool = False,
     ):
         # Budget constraint: exactly one of max_metric_calls or num_iters must be set
         assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
@@ -57,6 +58,8 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         # Merge scheduling flags (mirroring previous behavior)
         if self.merge_proposer is not None:
             self.merge_proposer.last_iter_found_new_program = False
+        
+        self.track_best_outputs = track_best_outputs
 
     def _val_evaluator(self) -> Callable[[Dict[str, str]], Tuple[List[RolloutOutput], List[float]]]:
         assert self.valset is not None
@@ -119,7 +122,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             logger=self.logger,
             seed_candidate=self.seed_candidate,
             valset_evaluator=self._val_evaluator(),
-            seed=self.seed,
+            track_best_outputs=self.track_best_outputs,
         )
 
         assert len(state.pareto_front_valset) == len(self.valset)

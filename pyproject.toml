@@ -11,7 +11,6 @@ authors = [
   { name = "Lakshya A Agrawal", email = "lakshyaaagrawal@berkeley.edu" }
 ]
 license = { text = "MIT" }
-readme = "README.md"
 requires-python = ">=3.10, <3.14"
 
 [project.optional-dependencies]
