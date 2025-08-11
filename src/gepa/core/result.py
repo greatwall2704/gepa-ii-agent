@@ -1,12 +1,13 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, Generic, List, Optional, Set, Tuple
+
+from gepa.core.adapter import RolloutOutput
 
 @dataclass(frozen=True)
-class GEPAResult:
+class GEPAResult(Generic[RolloutOutput]):
     """
     Immutable snapshot of a GEPA run with convenience accessors.
 
-    Raw fields (stable):
     - candidates: list of proposed candidates (component_name -> component_text)
     - parents: lineage info; for each candidate i, parents[i] is a list of parent indices or None
     - val_aggregate_scores: per-candidate aggregate score on the validation set (higher is better)
@@ -14,7 +15,10 @@ class GEPAResult:
     - per_val_instance_best_candidates: for each val instance t, a set of candidate indices achieving the current best score on t
     - discovery_eval_counts: number of metric calls accumulated up to the discovery of each candidate
 
-    Run-level metadata (optional, may be None if not tracked):
+    Optional fields:
+    - best_outputs_valset: per-task best outputs on the validation set. [task_idx -> [(program_idx_1, output_1), (program_idx_2, output_2), ...]]
+    
+    Run-level metadata:
     - total_metric_calls: total number of metric calls made across the run
     - num_full_val_evals: number of full validation evaluations performed
     - run_dir: where artifacts were written (if any)
@@ -38,6 +42,9 @@ class GEPAResult:
     val_subscores: List[List[float]]
     per_val_instance_best_candidates: List[Set[int]]
     discovery_eval_counts: List[int]
+
+    # Optional data
+    best_outputs_valset: Optional[List[List[Tuple[int, List[RolloutOutput]]]]] = None
 
     # Run metadata (optional)
     total_metric_calls: Optional[int] = None
@@ -74,6 +81,7 @@ class GEPAResult:
             parents=self.parents,
             val_aggregate_scores=self.val_aggregate_scores,
             val_subscores=self.val_subscores,
+            best_outputs_valset=self.best_outputs_valset,
             per_val_instance_best_candidates=[list(s) for s in self.per_val_instance_best_candidates],
             discovery_eval_counts=self.discovery_eval_counts,
             total_metric_calls=self.total_metric_calls,
@@ -92,6 +100,7 @@ class GEPAResult:
             candidates=list(state.program_candidates),
             parents=list(state.parent_program_for_candidate),
             val_aggregate_scores=list(state.program_full_scores_val_set),
+            best_outputs_valset=getattr(state, "best_outputs_valset", None),
             val_subscores=[list(s) for s in state.prog_candidate_val_subscores],
             per_val_instance_best_candidates=[set(s) for s in state.program_at_pareto_front_valset],
             discovery_eval_counts=list(state.num_metric_calls_by_discovery),

@@ -21,7 +21,7 @@ def optimize(
     reflection_lm: Optional[LanguageModel] = None,
     candidate_selection_strategy: str = "pareto",
     skip_perfect_score=True,
-    num_examples_per_gepa_step=3,
+    reflection_minibatch_size=3,
     perfect_score=1,
 
     # Merge-based configuration
@@ -38,9 +38,10 @@ def optimize(
     use_wandb: bool = False,
     wandb_api_key: Optional[str] = None,
     wandb_init_kwargs: Optional[Dict[str, Any]] = None,
+    track_best_outputs: bool = False,
 
     # Reproducibility
-    seed=0,
+    seed: int = 0,
 ):
     """
     GEPA is an evolutionary optimizer that evolves (multiple) text components of a complex system to optimize them towards a given metric.
@@ -82,12 +83,32 @@ def optimize(
     - trainset: The training set to use for reflective updates.
     - valset: The validation set to use for tracking Pareto scores. If not provided, GEPA will use the trainset for both.
     - adapter: A `GEPAAdapter` instance that implements the adapter interface. This allows GEPA to plug into your system's environment.
+    
+    # Reflection-based configuration
     - reflection_lm: A `LanguageModel` instance that is used to reflect on the performance of the candidate program.
     - candidate_selection_strategy: The strategy to use for selecting the candidate to update.
     - skip_perfect_score: Whether to skip updating the candidate if it achieves a perfect score on the minibatch.
-    - num_examples_per_gepa_step: The number of examples to use for each GEPA step.
+    - reflection_minibatch_size: The number of examples to use for reflection in each proposal step.
     - perfect_score: The perfect score to achieve.
+    
+    # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
+    - max_merge_invocations: The maximum number of merge invocations to perform.
+
+    # Budget
+    - num_iters: The number of iterations to run.
+    - max_metric_calls: The maximum number of metric calls to perform.
+
+    # Logging
+    - logger: A `LoggerProtocol` instance that is used to log the progress of the optimization.
+    - run_dir: The directory to save the results to.
+    - use_wandb: Whether to use Weights and Biases to log the progress of the optimization.
+    - wandb_api_key: The API key to use for Weights and Biases.
+    - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
+    - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
+
+    # Reproducibility
+    - seed: The seed to use for the random number generator.
     """
     assert adapter is not None, "GEPA currently requires an adapter to be provided. We will soon support simpler application without an adapter."
     assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
@@ -103,7 +124,7 @@ def optimize(
     rng = random.Random(seed)
     candidate_selector = ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
     module_selector = RoundRobinReflectionComponentSelector()
-    batch_sampler = EpochShuffledBatchSampler(minibatch_size=num_examples_per_gepa_step, rng=rng)
+    batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size, rng=rng)
 
     reflective_proposer = ReflectiveMutationProposer(
         logger=logger,
@@ -152,6 +173,7 @@ def optimize(
         use_wandb=use_wandb,
         wandb_api_key=wandb_api_key,
         wandb_init_kwargs=wandb_init_kwargs,
+        track_best_outputs=track_best_outputs,
     )
     state = engine.run()
     result = GEPAResult.from_state(state)
