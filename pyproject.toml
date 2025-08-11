@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=77.0.1"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "gepa"
 version = "0.0.1"
-description = "GEPA is a novel prompt optimizers that uses text feedback to improve compound AI systems."
+description = "A framework for optimizing textual system components (AI prompts, code snippets, etc.) using LLM-based reflection and Pareto-efficient evolutionary search."
 readme = "README.md"
 authors = [
   { name = "Lakshya A Agrawal", email = "lakshyaaagrawal@berkeley.edu" }

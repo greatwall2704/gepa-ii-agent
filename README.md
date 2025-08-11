@@ -1,6 +1,6 @@
 # GEPA: System Optimization through Reflective Text Evolution
 
-> **Efficiently evolve and optimize any system controlled by text—AI prompts, code, or instructions—using reflective evolution.**
+> **Efficiently evolve and optimize text components of any system—AI prompts, code, or instructions—using reflective evolution.**
 
 ---
 
@@ -12,7 +12,7 @@ GEPA can **optimize any modular system that exposes text parameters** (instructi
 
 > **The easiest and most powerful way to use GEPA is within [DSPy](https://dspy.ai/), where the GEPA algorithm is directly available through the `dspy.GEPA` API. If you use DSPy for building your AI systems, you already have access to GEPA without special integration.**
 
-This repository provides the official implementation of the GEPA algorithm as proposed in the paper titled "GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning" ([https://arxiv.org/abs/2507.19457](https://arxiv.org/abs/2507.19457)).
+This repository provides the official implementation of the GEPA algorithm as proposed in the paper titled "GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning" ([https://arxiv.org/abs/2507.19457](https://arxiv.org/abs/2507.19457)). In order to reproduce experiments from the GEPA paper, we provide a separate, [reproduction artifact](https://github.com/gepa-ai/gepa-artifact).
 
 ---
 
