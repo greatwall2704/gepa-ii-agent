@@ -78,7 +78,7 @@ We highly recommend using GEPA from within DSPy as [dspy.GEPA](https://dspy.ai/a
 ### Using GEPA Directly
 
 GEPA can be used to optimize any system consisting of textual components. Follow these steps:
- - **Implement `GEPAAdapter`:** In order to allow the GEPA optimizer to pair with your system and its environment, GEPA requires users to implement the `GEPAAdapter` interface defined in [src/gepa/gepa.py](src/gepa/gepa.py). `GEPAAdapter` requires 2 methods:
+ - **Implement `GEPAAdapter`:** In order to allow the GEPA optimizer to pair with your system and its environment, GEPA requires users to implement the `GEPAAdapter` interface defined in [src/gepa/core/adapter.py](src/gepa/core/adapter.py). `GEPAAdapter` requires 2 methods:
     - Evaluate: Given a candidate consisting of proposed text components, and a minibatch of inputs sampled from the train/val sets, evaluate and return execution scores, also capturing the system traces.
     - Extract Traces for Reflection: Given the execution traces obtained from executing a proposed candidate, and a named component being optimized, return the textual content from the traces relevant to the named component.
 - **Prepare trainset and valset:** Lists of example inputs and task metadata.
@@ -159,9 +159,9 @@ For code modules, domain-specific transformation, or response rewriters, similar
 
 ## Advanced: Customization and Extension
 
-- **Adapters:** Implement the `GEPAAdapter` interface to plug GEPA into new systems (see `src/gepa/gepa.py`).
-- **Candidate and Module Selectors:** Swap out candidate or module selection logic to bias toward different exploration/exploitation balances.
-- **Reflection Prompts:** Customize the prompt templates or output extractors for new component types or domains.
+- **Adapters:** Implement the `GEPAAdapter` interface ([src/gepa/core/adapter.py](src/gepa/core/adapter.py)) to plug GEPA into your system/environment.
+- **Candidate and Module Selectors:** Swap out candidate and component selection logic to bias toward different exploration/exploitation balances (see [src/gepa/proposer/reflective_mutation/base.py](src/gepa/proposer/reflective_mutation/base.py) and [src/gepa/strategies/](src/gepa/strategies/)).
+- **Reflection Prompts:** Customize the prompt templates or output extractors for new component types or domains (see [src/gepa/strategies/instruction_proposal.py](src/gepa/strategies/instruction_proposal.py)).
 - **Feedback Engineering:** Maximize impact by designing evaluation metrics and feedback traces that provide the most actionable information.
 
 ---
