@@ -1,0 +1,214 @@
+import traceback
+from typing import Any, Callable, Dict, List, Optional, Tuple, Generic
+
+from gepa.logging.utils import log_detailed_metrics_after_discovering_new_program
+from gepa.logging.wandb_utils import initialize_wandb
+from gepa.proposer.merge import MergeProposer
+from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
+from .adapter import RolloutOutput, Trajectory, DataInst
+from gepa.core.state import GEPAState, initialize_gepa_state
+
+class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
+    """
+    Orchestrates the optimization loop. It uses pluggable ProposeNewCandidate strategies.
+    """
+    def __init__(
+        self,
+        run_dir: Optional[str],
+        evaluator: Callable[[List[DataInst], Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
+        valset: Optional[List[DataInst]],
+        seed_candidate: Dict[str, str],
+        # Controls
+        num_iters: Optional[int],
+        max_metric_calls: Optional[int],
+        perfect_score: float,
+        seed: int,
+        # Strategies and helpers
+        reflective_proposer: ReflectiveMutationProposer,
+        merge_proposer: Optional[MergeProposer],
+        # Logging
+        logger: Any,
+        use_wandb: bool = False,
+        wandb_api_key: Optional[str] = None,
+        wandb_init_kwargs: Optional[Dict[str, Any]] = None,
+    ):
+        # Budget constraint: exactly one of max_metric_calls or num_iters must be set
+        assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
+            f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
+
+        self.logger = logger
+        self.run_dir = run_dir
+        self.evaluator = evaluator
+        self.valset = valset
+        self.seed_candidate = seed_candidate
+
+        self.num_iters = num_iters
+        self.max_metric_calls = max_metric_calls
+
+        self.perfect_score = perfect_score
+        self.use_wandb = use_wandb
+        self.wandb_api_key = wandb_api_key
+        self.seed = seed
+        self.wandb_init_kwargs = wandb_init_kwargs or {}
+
+        self.reflective_proposer = reflective_proposer
+        self.merge_proposer = merge_proposer
+
+        # Merge scheduling flags (mirroring previous behavior)
+        if self.merge_proposer is not None:
+            self.merge_proposer.last_iter_found_new_program = False
+
+    def _val_evaluator(self) -> Callable[[Dict[str, str]], Tuple[List[RolloutOutput], List[float]]]:
+        assert self.valset is not None
+        return lambda prog: self.evaluator(self.valset, prog)
+
+    def _get_pareto_front_programs(self, state: GEPAState) -> List:
+        return state.program_at_pareto_front_valset
+
+    def _run_full_eval_and_add(
+        self,
+        new_program: Dict[str, str],
+        state: GEPAState,
+        parent_program_idx: List[int],
+    ) -> Tuple[int, int]:
+        num_metric_calls_by_discovery = state.total_num_evals
+
+        valset_outputs, valset_subscores = self._val_evaluator()(new_program)
+        valset_score = sum(valset_subscores) / len(valset_subscores)
+
+        state.num_full_ds_evals += 1
+        state.total_num_evals += len(valset_subscores)
+
+        new_program_idx, linear_pareto_front_program_idx = state.update_state_with_new_program(
+            parent_program_idx=parent_program_idx,
+            new_program=new_program,
+            valset_score=valset_score,
+            valset_outputs=valset_outputs,
+            valset_subscores=valset_subscores,
+            run_dir=self.run_dir,
+            num_metric_calls_by_discovery_of_new_program=num_metric_calls_by_discovery
+        )
+        state.full_program_trace[-1]['new_program_idx'] = new_program_idx
+
+        if new_program_idx == linear_pareto_front_program_idx:
+            self.logger.log(f"Iteration {state.i+1}: New program is on the linear pareto front")
+
+        log_detailed_metrics_after_discovering_new_program(
+            logger=self.logger,
+            gepa_state=state,
+            valset_score=valset_score,
+            new_program_idx=new_program_idx,
+            valset_subscores=valset_subscores,
+            # new_instruction="Merged or Reflective program",
+            use_wandb=self.use_wandb,
+            linear_pareto_front_program_idx=linear_pareto_front_program_idx,
+        )
+        return new_program_idx, linear_pareto_front_program_idx
+
+    def run(self) -> GEPAState:
+        if self.use_wandb:
+            initialize_wandb(wandb_api_key=self.wandb_api_key, wandb_init_kwargs=self.wandb_init_kwargs)
+
+        # Prepare valset
+        if self.valset is None:
+            raise ValueError("valset must be provided to GEPAEngine.run()")
+
+        # Initialize state (keeps your previous semantics)
+        state = initialize_gepa_state(
+            run_dir=self.run_dir,
+            logger=self.logger,
+            seed_candidate=self.seed_candidate,
+            valset_evaluator=self._val_evaluator(),
+            seed=self.seed,
+        )
+
+        assert len(state.pareto_front_valset) == len(self.valset)
+
+        if self.use_wandb:
+            import wandb  # type: ignore
+            wandb.log({
+                "base_program_full_valset_score": state.program_full_scores_val_set[0],
+                "iteration": state.i+1,
+            })
+        self.logger.log(f"Iteration {state.i+1}: Base program full valset score: {state.program_full_scores_val_set[0]}")
+
+        # Merge scheduling
+        if self.merge_proposer is not None:
+            self.merge_proposer.last_iter_found_new_program = False
+
+        # Main loop
+        while (
+            (self.num_iters is None or state.num_full_ds_evals < self.num_iters) and
+            (self.max_metric_calls is None or state.total_num_evals < self.max_metric_calls)
+        ):
+            assert state.is_consistent()
+            try:
+                state.save(self.run_dir)
+                state.i += 1
+                state.full_program_trace.append({"i": state.i})
+
+                # 1) Attempt merge first if scheduled and last iter found new program
+                if self.merge_proposer is not None and self.merge_proposer.use_merge:
+                    if self.merge_proposer.merges_due > 0 and self.merge_proposer.last_iter_found_new_program:
+                        proposal = self.merge_proposer.propose(state)
+                        # Old behavior: clear the flag as soon as we attempt a merge
+                        self.merge_proposer.last_iter_found_new_program = False
+
+                        if proposal is not None and proposal.tag == "merge":
+                            parent_sums = proposal.subsample_scores_before or [float("-inf"), float("-inf")]
+                            new_sum = sum(proposal.subsample_scores_after or [])
+
+                            if new_sum >= max(parent_sums):
+                                # ACCEPTED: consume one merge attempt and record it
+                                self._run_full_eval_and_add(
+                                    new_program=proposal.candidate,
+                                    state=state,
+                                    parent_program_idx=proposal.parent_program_ids,
+                                )
+                                self.merge_proposer.merges_due -= 1
+                                self.merge_proposer.total_merges_tested += 1
+                                # Skip reflective this iteration (old behavior)
+                                continue
+                            else:
+                                # REJECTED: do NOT consume merges_due or total_merges_tested
+                                self.logger.log(
+                                    f"Iteration {state.i+1}: New program subsample score {new_sum} is worse than both parents {parent_sums}, skipping merge"
+                                )
+                                # Skip reflective this iteration (old behavior)
+                                continue
+                    # Old behavior: regardless of whether we attempted, clear the flag before reflective
+                    self.merge_proposer.last_iter_found_new_program = False
+
+                # 2) Reflective mutation proposer
+                proposal = self.reflective_proposer.propose(state)
+                if proposal is None:
+                    self.logger.log(f"Iteration {state.i+1}: Reflective mutation did not propose a new candidate")
+                    continue
+
+                # Acceptance: require strict improvement on subsample
+                old_sum = sum(proposal.subsample_scores_before or [])
+                new_sum = sum(proposal.subsample_scores_after or [])
+                if new_sum <= old_sum:
+                    self.logger.log(f"Iteration {state.i+1}: New subsample score is not better, skipping")
+                    continue
+
+                # Accept: full eval + add
+                self._run_full_eval_and_add(
+                    new_program=proposal.candidate,
+                    state=state,
+                    parent_program_idx=proposal.parent_program_ids
+                )
+
+                # Schedule merge attempts like original behavior
+                if self.merge_proposer is not None:
+                    self.merge_proposer.last_iter_found_new_program = True
+                    if self.merge_proposer.total_merges_tested < self.merge_proposer.max_merge_invocations:
+                        self.merge_proposer.merges_due += 1
+
+            except Exception as e:
+                self.logger.log(f"Iteration {state.i+1}: Exception during optimization: {e}")
+                self.logger.log(traceback.format_exc())
+                continue
+
+        state.save(self.run_dir)
+        return state

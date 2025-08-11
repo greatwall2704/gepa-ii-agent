@@ -1,3 +1,17 @@
+from typing import List
+
+def json_default(x):
+    """Default JSON encoder for objects that are not serializable by default."""
+    try:
+        return {**x}
+    except:
+        return repr(x)
+
+def idxmax(lst: List[float]) -> int:
+    """Return the index of the maximum value in a list."""
+    max_val = max(lst)
+    return lst.index(max_val)
+
 def is_dominated(y, programs, program_at_pareto_front_valset):
     y_fronts = [front for front in program_at_pareto_front_valset if y in front]
     for front in y_fronts:
@@ -46,3 +60,27 @@ def remove_dominated_programs(program_at_pareto_front_valset, scores=None):
         assert front_new.issubset(front_old)
 
     return new_program_at_pareto_front_valset
+
+def find_dominator_programs(pareto_front_programs, train_val_weighted_agg_scores_for_all_programs):
+    train_val_pareto_front_programs = pareto_front_programs
+    new_program_at_pareto_front_valset = remove_dominated_programs(train_val_pareto_front_programs, scores=train_val_weighted_agg_scores_for_all_programs)
+    uniq_progs = []
+    for front in new_program_at_pareto_front_valset:
+        uniq_progs.extend(front)
+    uniq_progs = set(uniq_progs)
+    return list(uniq_progs)
+
+def select_program_candidate_from_pareto_front(pareto_front_programs, train_val_weighted_agg_scores_for_all_programs, rng):
+    train_val_pareto_front_programs = pareto_front_programs
+    new_program_at_pareto_front_valset = remove_dominated_programs(train_val_pareto_front_programs, scores=train_val_weighted_agg_scores_for_all_programs)
+    program_frequency_in_validation_pareto_front = {}
+    for testcase_pareto_front in new_program_at_pareto_front_valset:
+        for prog_idx in testcase_pareto_front:
+            if prog_idx not in program_frequency_in_validation_pareto_front:
+                program_frequency_in_validation_pareto_front[prog_idx] = 0
+            program_frequency_in_validation_pareto_front[prog_idx] += 1
+    
+    sampling_list = [prog_idx for prog_idx, freq in program_frequency_in_validation_pareto_front.items() for _ in range(freq)]
+    assert len(sampling_list) > 0
+    curr_prog_id = rng.choice(sampling_list)
+    return curr_prog_id
