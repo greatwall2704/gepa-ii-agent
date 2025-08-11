@@ -166,6 +166,12 @@ For code modules, domain-specific transformation, or response rewriters, similar
 
 ---
 
+# Contributions
+
+We encourage the community and users to help us develop adapters to allow GEPA to be used for optimizing all kinds of systems leveraging textual components. Refer to [DSPy/GEPAAdapter](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) for an example `GEPAAdapter` implementation.
+
+---
+
 ## Reference & Citation
 
 GEPA is described in:
