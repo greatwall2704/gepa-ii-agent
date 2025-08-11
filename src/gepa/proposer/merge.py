@@ -1,5 +1,11 @@
 from copy import deepcopy
-from typing import Dict, List
+from typing import Dict, List, Any, Callable, Tuple, Optional
+import random
+import math
+from gepa.core.adapter import DataInst, RolloutOutput
+from gepa.core.state import GEPAState
+from gepa.proposer.base import ProposeNewCandidate, CandidateProposal
+from gepa.gepa_utils import find_dominator_programs
 
 def does_triplet_have_desirable_predictors(program_candidates: List[Dict[str, str]], ancestor, id1, id2):
     found_predictors = []
@@ -144,3 +150,132 @@ def sample_and_attempt_merge_programs_by_common_predictors(agg_scores, rng, merg
         return (True, new_program, id1, id2, ancestor)
     
     return (False, None, None, None, None)
+
+class MergeProposer(ProposeNewCandidate):
+    """
+    Implements current merge flow:
+    - Find merge candidates among Pareto front dominators
+    - Attempt a merge via sample_and_attempt_merge_programs_by_common_predictors
+    - Subsample eval on valset-driven selected indices
+    - Return proposal if merge's subsample score >= max(parents)
+    The engine handles full eval + adding to state.
+    """
+    def __init__(
+        self,
+        logger: Any,
+        valset: List[DataInst],
+        evaluator: Callable[[List[DataInst], Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
+        use_merge: bool,
+        max_merge_invocations: int,
+        rng: Optional[random.Random] = None,
+    ):
+        self.logger = logger
+        self.valset = valset
+        self.evaluator = evaluator
+        self.use_merge = use_merge
+        self.max_merge_invocations = max_merge_invocations
+        if rng is None:
+            self.rng = random.Random(0)
+        else:
+            self.rng = rng
+
+        # Internal counters matching original behavior
+        self.merges_due = 0
+        self.total_merges_tested = 0
+        self.merges_performed: Tuple[List[Tuple[int, int, int]], Any] = ([], [])
+
+        # Toggle controlled by engine: set True when last iter found new program
+        self.last_iter_found_new_program = False
+
+    def schedule_if_needed(self):
+        if self.use_merge and self.total_merges_tested < self.max_merge_invocations:
+            self.merges_due += 1
+
+    def select_eval_subsample_for_merged_program(
+        self,
+        scores1: List[float],
+        scores2: List[float],
+        num_subsample_ids: int = 5,
+    ) -> List[int]:
+        all_indices = set(range(len(scores1)))
+        p1 = [i for i, (s1, s2) in enumerate(zip(scores1, scores2)) if s1 > s2]
+        p2 = [i for i, (s1, s2) in enumerate(zip(scores1, scores2)) if s2 > s1]
+        p3 = [i for i in all_indices if i not in p1 and i not in p2]
+
+        n_each = math.ceil(num_subsample_ids / 3)
+        n1 = min(len(p1), n_each)
+        n2 = min(len(p2), n_each)
+        n3 = min(len(p3), num_subsample_ids - (n1 + n2))
+        selected = []
+        if n1: selected += self.rng.sample(p1, k=n1)
+        if n2: selected += self.rng.sample(p2, k=n2)
+        if n3: selected += self.rng.sample(p3, k=n3)
+
+        remaining = num_subsample_ids - len(selected)
+        unused = list(all_indices - set(selected))
+        if remaining > 0:
+            if len(unused) >= remaining:
+                selected += self.rng.sample(unused, k=remaining)
+            else:
+                selected += self.rng.choices(list(all_indices), k=remaining)
+        return selected[:num_subsample_ids]
+
+    def propose(self, state: GEPAState) -> Optional[CandidateProposal]:
+        i = state.i + 1
+        state.full_program_trace[-1]['invoked_merge'] = True
+
+        # Only attempt when scheduled by engine and after a new program in last iteration
+        if not (self.use_merge and self.last_iter_found_new_program and self.merges_due > 0):
+            self.logger.log(f"Iteration {i}: No merge candidates scheduled")
+            return None
+
+        pareto_front_programs = state.program_at_pareto_front_valset
+        merge_candidates = find_dominator_programs(pareto_front_programs, state.per_program_tracked_scores)
+        merge_output = sample_and_attempt_merge_programs_by_common_predictors(
+            agg_scores=state.per_program_tracked_scores,
+            rng=self.rng,
+            merge_candidates=merge_candidates,
+            merges_performed=self.merges_performed,
+            program_candidates=state.program_candidates,
+            parent_program_for_candidate=state.parent_program_for_candidate,
+        )
+
+        if not merge_output[0]:
+            self.logger.log(f"Iteration {i}: No merge candidates found")
+            return None
+
+        # success, new_program, id1, id2, ancestor
+        success, new_program, id1, id2, ancestor = merge_output
+        state.full_program_trace[-1]['merged'] = True
+        state.full_program_trace[-1]['merged_entities'] = (id1, id2, ancestor)
+        self.merges_performed[0].append((id1, id2, ancestor))
+        self.logger.log(f"Iteration {i}: Merged programs {id1} and {id2} via ancestor {ancestor}")
+
+        subsample_ids = self.select_eval_subsample_for_merged_program(
+            state.prog_candidate_val_subscores[id1],
+            state.prog_candidate_val_subscores[id2],
+        )
+        mini_devset = [self.valset[k] for k in subsample_ids]
+        id1_sub_scores = [state.prog_candidate_val_subscores[id1][k] for k in subsample_ids]
+        id2_sub_scores = [state.prog_candidate_val_subscores[id2][k] for k in subsample_ids]
+        state.full_program_trace[-1]['subsample_ids'] = subsample_ids
+
+        _, new_sub_scores = self.evaluator(mini_devset, new_program)
+
+        state.full_program_trace[-1]['id1_subsample_scores'] = id1_sub_scores
+        state.full_program_trace[-1]['id2_subsample_scores'] = id2_sub_scores
+        state.full_program_trace[-1]['new_program_subsample_scores'] = new_sub_scores
+
+        # Count evals
+        state.total_num_evals += len(subsample_ids)
+
+        # Acceptance will be evaluated by engine (>= max(parents))
+        return CandidateProposal(
+            candidate=new_program,
+            parent_program_ids=[id1, id2],
+            subsample_indices=subsample_ids,
+            subsample_scores_before=[sum(id1_sub_scores), sum(id2_sub_scores)],  # packed as [parent1_sum, parent2_sum]
+            subsample_scores_after=new_sub_scores,
+            tag="merge",
+            metadata={"ancestor": ancestor}
+        )

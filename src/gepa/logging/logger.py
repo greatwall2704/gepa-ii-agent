@@ -1,3 +1,13 @@
+from typing import Protocol
+
+class LoggerProtocol(Protocol):
+    def log(self, message: str):
+        ...
+
+class StdOutLogger(LoggerProtocol):
+    def log(self, message: str):
+        print(message)
+
 import sys
 
 class Tee(object):
@@ -26,7 +36,7 @@ class Tee(object):
                 return f.fileno()
         raise OSError("No underlying file object with fileno")
 
-class Logger:
+class Logger(LoggerProtocol):
     def __init__(self, filename, mode='a'):
         self.file_handle = open(filename, mode)
         self.file_handle_stderr = open(filename.replace("run_log.", "run_log_stderr."), mode)
@@ -52,6 +62,7 @@ class Logger:
             print(*args, **kwargs)
         else:
             # Emulate print(*args, **kwargs) behavior but write to the file
-            print(*args, file=self.file_handle, **kwargs)
+            print(*args, **kwargs)
+            print(*args, file=self.file_handle_stderr, **kwargs)
         self.file_handle.flush()
         self.file_handle_stderr.flush()

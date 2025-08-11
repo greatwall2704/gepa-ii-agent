@@ -1,23 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Protocol
-
-class LanguageModel(Protocol):
-    def __call__(self, prompt: str) -> str:
-        ...
-
-@dataclass
-class Signature:
-    prompt_template: str
-    input_keys: List[str]
-    output_keys: List[str]
-    prompt_renderer: Callable[[Dict[str, str]], str]
-    output_extractor: Callable[[str], Dict[str, str]]
-
-    @classmethod
-    def run(cls, lm: LanguageModel, input_dict: Dict[str, str]) -> Dict[str, str]:
-        full_prompt = cls.prompt_renderer(input_dict)
-        lm_out = lm(full_prompt).strip()
-        return cls.output_extractor(lm_out)
+from gepa.proposer.reflective_mutation.base import Signature
 
 class InstructionProposalSignature(Signature):
     prompt_template = """I provided an assistant with the following instructions to perform a task for me:
