@@ -22,8 +22,6 @@ class GEPAState:
 
     num_metric_calls_by_discovery: List[int]
 
-    running_linearized_gepa: bool
-
     full_program_trace: List
 
     per_program_tracked_scores: List[float]
@@ -33,7 +31,6 @@ class GEPAState:
         seed_candidate: Dict[str, str],
         base_valset_eval_output: tuple[Any, List[float]],
         seed: int, 
-        run_linearized_gepa: bool=False
     ):
         valset_base_score = sum(base_valset_eval_output[1]) / len(base_valset_eval_output[1])
         base_valset_pareto_front = base_valset_eval_output[1]
@@ -53,8 +50,6 @@ class GEPAState:
 
         self.prog_candidate_val_subscores = [base_valset_eval_output[1]]
         self.num_metric_calls_by_discovery = [0]
-
-        self.running_linearized_gepa = run_linearized_gepa
 
         self.full_program_trace = []
 
@@ -180,8 +175,7 @@ def initialize_gepa_state(
     logger, 
     seed_candidate: Dict[str, str],
     valset_evaluator: Callable[[Dict[str, str]], Tuple[Any, List[float]]],
-    seed: int, 
-    run_linearized_gepa: bool = False,
+    seed: int,
 ):
     if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")) and os.path.exists(os.path.join(run_dir, "prog_candidates")):
         logger.log("Loading gepa state from run dir")
@@ -198,7 +192,6 @@ def initialize_gepa_state(
             seed_candidate, 
             valset_out,
             seed,
-            run_linearized_gepa=run_linearized_gepa,
         )
 
         gepa_state.num_full_ds_evals = 1
@@ -299,8 +292,8 @@ def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAS
 
     wandb_logs = {
         "iteration": gepa_state.i+1,
-        "full_valset_score": valset_score,
-        "full_train_val_score": gepa_state.per_program_tracked_scores[new_program_idx],
+        # "full_valset_score": valset_score,
+        # "full_train_val_score": gepa_state.per_program_tracked_scores[new_program_idx],
         "new_program_idx": new_program_idx,
         "valset_pareto_front_scores": gepa_state.pareto_front_valset,
         "individual_valset_score_new_program": valset_subscores,
