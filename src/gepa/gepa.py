@@ -347,7 +347,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         perfect_score: float,
         skip_perfect_score: bool,
         use_wandb: bool,
-        teacher_lm: Optional[LanguageModel] = None,
+        reflection_lm: Optional[LanguageModel] = None,
     ):
         self.logger = logger
         self.trainset = trainset
@@ -358,7 +358,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         self.perfect_score = perfect_score
         self.skip_perfect_score = skip_perfect_score
         self.use_wandb = use_wandb
-        self.teacher_lm = teacher_lm
+        self.reflection_lm = reflection_lm
 
     def propose_new_texts(
         self,
@@ -375,7 +375,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
             base_instruction = candidate[name]
             dataset_with_feedback = reflective_dataset[name]
             new_texts[name] = InstructionProposalSignature.run(
-                lm=self.teacher_lm,
+                lm=self.reflection_lm,
                 input_dict={
                     "current_instruction_doc": base_instruction,
                     "dataset_with_feedback": dataset_with_feedback
@@ -603,21 +603,23 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
     """
     def __init__(
         self,
-        logger: Any,
-        run_dir: str,
+        run_dir: Optional[str],
         evaluator: Callable[[List[DataInst], Dict[str, str]], Tuple[List[RolloutOutput], List[float]]],
         valset: Optional[List[DataInst]],
-        base_program: Dict[str, str],
+        seed_candidate: Dict[str, str],
         # Controls
         num_iters: Optional[int],
         max_metric_calls: Optional[int],
         perfect_score: float,
-        use_wandb: bool,
-        wandb_api_key: Optional[str],
         seed: int,
         # Strategies and helpers
         reflective_proposer: ReflectiveMutationProposer,
         merge_proposer: Optional[MergeProposer],
+        # Logging
+        logger: Any,
+        use_wandb: bool = False,
+        wandb_api_key: Optional[str] = None,
+        wandb_init_kwargs: Optional[Dict[str, Any]] = None,
     ):
         # Budget constraint: exactly one of max_metric_calls or num_iters must be set
         assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
@@ -627,7 +629,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         self.run_dir = run_dir
         self.evaluator = evaluator
         self.valset = valset
-        self.base_program = base_program
+        self.seed_candidate = seed_candidate
 
         self.num_iters = num_iters
         self.max_metric_calls = max_metric_calls
@@ -636,6 +638,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         self.use_wandb = use_wandb
         self.wandb_api_key = wandb_api_key
         self.seed = seed
+        self.wandb_init_kwargs = wandb_init_kwargs or {}
 
         self.reflective_proposer = reflective_proposer
         self.merge_proposer = merge_proposer
@@ -693,7 +696,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
     def run(self) -> GEPAState:
         if self.use_wandb:
-            initialize_wandb(wandb_api_key=self.wandb_api_key, run_dir=self.run_dir)
+            initialize_wandb(wandb_api_key=self.wandb_api_key, wandb_init_kwargs=self.wandb_init_kwargs)
 
         # Prepare valset
         if self.valset is None:
@@ -703,7 +706,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         state = initialize_gepa_state(
             run_dir=self.run_dir,
             logger=self.logger,
-            base_program=self.base_program,
+            seed_candidate=self.seed_candidate,
             valset_evaluator=self._val_evaluator(),
             seed=self.seed,
         )
@@ -800,24 +803,25 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         return state
 
 def optimize(
-    base_program: Dict[str, str],
+    seed_candidate: Dict[str, str],
     trainset: List[DataInst],
     adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
     logger,
-    run_dir: str,
-    teacher_lm: LanguageModel,
+    reflection_lm: LanguageModel,
     valset: Optional[List[DataInst]] = None,
     candidate_selection_strategy: str = "pareto",
     num_iters=None,
     perfect_score=1,
-    use_wandb: bool = False,
-    wandb_api_key: Optional[str] = None,
     seed=0,
     skip_perfect_score=True,
     use_merge=False,
     max_merge_invocations=5,
     num_examples_per_gepa_step=3,
     max_metric_calls=None,
+    run_dir: Optional[str] = None,
+    use_wandb: bool = False,
+    wandb_api_key: Optional[str] = None,
+    wandb_init_kwargs: Optional[Dict[str, Any]] = None,
 ):
 
     assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
@@ -841,7 +845,7 @@ def optimize(
         perfect_score=perfect_score,
         skip_perfect_score=skip_perfect_score,
         use_wandb=use_wandb,
-        teacher_lm=teacher_lm,
+        reflection_lm=reflection_lm,
     )
 
     merge_proposer = None
@@ -864,19 +868,20 @@ def optimize(
         return eval_out.outputs, eval_out.scores
 
     engine = GEPAEngine(
-        logger=logger,
         run_dir=run_dir,
         evaluator=full_eval,
         valset=valset,
-        base_program=base_program,
+        seed_candidate=seed_candidate,
         num_iters=num_iters,
         max_metric_calls=max_metric_calls,
         perfect_score=perfect_score,
-        use_wandb=use_wandb,
-        wandb_api_key=wandb_api_key,
         seed=seed,
         reflective_proposer=reflective_proposer,
         merge_proposer=merge_proposer,
+        logger=logger,
+        use_wandb=use_wandb,
+        wandb_api_key=wandb_api_key,
+        wandb_init_kwargs=wandb_init_kwargs,
     )
     state = engine.run()
     result = GEPAResult.from_state(state)

@@ -30,7 +30,7 @@ class GEPAState:
 
     def __init__(
         self, 
-        base_program: Dict[str, str],
+        seed_candidate: Dict[str, str],
         base_valset_eval_output: tuple[Any, List[float]],
         seed: int, 
         run_linearized_gepa: bool=False
@@ -38,7 +38,7 @@ class GEPAState:
         valset_base_score = sum(base_valset_eval_output[1]) / len(base_valset_eval_output[1])
         base_valset_pareto_front = base_valset_eval_output[1]
 
-        self.program_candidates = [base_program]
+        self.program_candidates = [seed_candidate]
         self.program_full_scores_val_set = [valset_base_score]
         
         self.per_program_tracked_scores = [valset_base_score]
@@ -47,7 +47,7 @@ class GEPAState:
         self.parent_program_for_candidate = [[None]]
         self.program_at_pareto_front_valset = [{0} for _ in range(len(base_valset_pareto_front))]
 
-        self.list_of_named_predictors = list(base_program.keys())
+        self.list_of_named_predictors = list(seed_candidate.keys())
         self.named_predictor_id_to_update_next_for_program_candidate = [0]
         self.i = -1
 
@@ -74,7 +74,9 @@ class GEPAState:
 
         return True
 
-    def save(self, run_dir:str):
+    def save(self, run_dir: Optional[str]):
+        if run_dir is None:
+            return
         # Save all the other state except programs as pickle
         with open(os.path.join(run_dir, "gepa_state.bin"), 'wb') as f:
             import pickle
@@ -104,7 +106,7 @@ class GEPAState:
         valset_score: float,
         valset_outputs: Any, 
         valset_subscores: List[float], 
-        run_dir: str, 
+        run_dir: Optional[str], 
         num_metric_calls_by_discovery_of_new_program: int
     ):
         new_program_idx = len(self.program_candidates)
@@ -121,9 +123,10 @@ class GEPAState:
             if new_score > old_score:
                 self.pareto_front_valset[task_idx] = new_score
                 self.program_at_pareto_front_valset[task_idx] = {new_program_idx}
-                os.makedirs(os.path.join(run_dir, "generated_best_outputs_valset", f"task_{task_idx}"), exist_ok=True)
-                with open(os.path.join(run_dir, "generated_best_outputs_valset", f"task_{task_idx}", f"iter_{self.i+1}_prog_{new_program_idx}.json"), 'w') as f:
-                    json.dump(valset_outputs[task_idx], f, indent=4, default=json_default)
+                if run_dir is not None:
+                    os.makedirs(os.path.join(run_dir, "generated_best_outputs_valset", f"task_{task_idx}"), exist_ok=True)
+                    with open(os.path.join(run_dir, "generated_best_outputs_valset", f"task_{task_idx}", f"iter_{self.i+1}_prog_{new_program_idx}.json"), 'w') as f:
+                        json.dump(valset_outputs[task_idx], f, indent=4, default=json_default)
             elif new_score == old_score:
                 self.program_at_pareto_front_valset[task_idx].add(new_program_idx)
 
@@ -156,7 +159,7 @@ def write_eval_output_to_directory(
         with open(os.path.join(output_dir, f"task_{task_idx}", f"iter_{0}_prog_0.json"), 'w') as f:
             json.dump(eval_out[1][task_idx], f, indent=4, default=json_default)
 
-def initialize_wandb(wandb_api_key: Union[str, None] = None, run_dir: str = None):
+def initialize_wandb(wandb_api_key: Union[str, None] = None, wandb_init_kwargs: Optional[Dict[str, Any]] = None):
     try:
         import wandb # type: ignore
         if wandb_api_key:
@@ -167,34 +170,32 @@ def initialize_wandb(wandb_api_key: Union[str, None] = None, run_dir: str = None
         raise ImportError("wandb is not installed. Please install it or set use_wandb=False.")
     except Exception as e:
         raise RuntimeError(f"Error logging into wandb: {e}")
-    
-    wandb_run = wandb.init(
-        project="gepa",
-        dir=os.path.join(run_dir, "wandb"),
-        name=run_dir,
-    )
+    if wandb_init_kwargs is None:
+        wandb_init_kwargs = {}
+    wandb_run = wandb.init(**wandb_init_kwargs)
     return wandb_run
 
 def initialize_gepa_state(
-    run_dir: str, 
+    run_dir: Optional[str], 
     logger, 
-    base_program: Dict[str, str],
+    seed_candidate: Dict[str, str],
     valset_evaluator: Callable[[Dict[str, str]], Tuple[Any, List[float]]],
     seed: int, 
     run_linearized_gepa: bool = False,
 ):
-    if os.path.exists(os.path.join(run_dir, "gepa_state.bin")) and os.path.exists(os.path.join(run_dir, "prog_candidates")):
+    if run_dir is not None and os.path.exists(os.path.join(run_dir, "gepa_state.bin")) and os.path.exists(os.path.join(run_dir, "prog_candidates")):
         logger.log("Loading gepa state from run dir")
         gepa_state = GEPAState.load(run_dir)
     else:
         num_evals_run = 0
 
-        valset_out = valset_evaluator(base_program)
-        write_eval_output_to_directory(valset_out, os.path.join(run_dir, "generated_best_outputs_valset"))
+        valset_out = valset_evaluator(seed_candidate)
+        if run_dir is not None:
+            write_eval_output_to_directory(valset_out, os.path.join(run_dir, "generated_best_outputs_valset"))
         num_evals_run += len(valset_out[1])
 
         gepa_state = GEPAState(
-            base_program, 
+            seed_candidate, 
             valset_out,
             seed,
             run_linearized_gepa=run_linearized_gepa,
