@@ -45,6 +45,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
         self.num_iters = num_iters
         self.max_metric_calls = max_metric_calls
+        assert (self.num_iters is not None) + (self.max_metric_calls is not None) == 1, f"Exactly one of num_iters or max_metric_calls should be set. You set num_iters={self.num_iters}, max_metric_calls={self.max_metric_calls}"
 
         self.perfect_score = perfect_score
         self.use_wandb = use_wandb
