@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/gepa_logo_with_text.svg" alt="GEPA Logo" width="500">
+  <img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/gepa_logo_with_text.svg" alt="GEPA Logo" width="500">
 </p>
 
 <h1 align="center">GEPA: System Optimization through Reflective Text Evolution</h1>
