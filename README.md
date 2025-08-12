@@ -1,8 +1,12 @@
-# GEPA: System Optimization through Reflective Text Evolution
+<p align="center">
+  <img src="https://raw.githubusercontent.com/gepa-ai/gepa/main/assets/gepa_logo_with_text.png" alt="GEPA Logo" width="500">
+</p>
 
-> **Efficiently evolve and optimize text components of any system—AI prompts, code, or instructions—using reflective evolution.**
+<h1 align="center">GEPA: System Optimization through Reflective Text Evolution</h1>
 
----
+<p align="center">
+  <em>Optimize text components—AI prompts, code, or instructions—of any system using reflective text evolution.</em>
+</p>
 
 ## Overview
 
