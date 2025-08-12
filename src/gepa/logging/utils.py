@@ -1,9 +1,6 @@
-import os
-import json
-from typing import Any, List, Tuple
 
 from gepa.core.state import GEPAState
-from gepa.gepa_utils import idxmax, json_default
+from gepa.gepa_utils import idxmax
 
 def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAState, valset_score, new_program_idx, valset_subscores, use_wandb, linear_pareto_front_program_idx):
     best_prog_as_per_agg_score = idxmax(gepa_state.per_program_tracked_scores)

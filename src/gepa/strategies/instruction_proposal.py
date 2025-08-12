@@ -1,5 +1,4 @@
-from dataclasses import dataclass
-from typing import Callable, Dict, List, Protocol
+from typing import Dict
 from gepa.proposer.reflective_mutation.base import Signature
 
 class InstructionProposalSignature(Signature):
