@@ -8,7 +8,7 @@
   <em>Optimize text components—AI prompts, code, or instructions—of any system using reflective text evolution.</em>
 </p>
 
-[![PyPI - Version](https://img.shields.io/pypi/v/gepa)](https://pypi.org/project/gepa/) [![PyPI Downloads](https://static.pepy.tech/badge/gepa)](https://pepy.tech/projects/gepa) [![LakshyAAAgrawal](https://img.shields.io/badge/Twitter-@LakshyAAAgrawal-00aced.svg?style=flat&logo=twitter)](https://twitter.com/LakshyAAAgrawal)
+[![PyPI - Version](https://img.shields.io/pypi/v/gepa)](https://pypi.org/project/gepa/) [![PyPI Downloads](https://static.pepy.tech/badge/gepa)](https://pepy.tech/projects/gepa)
 
 ## Overview
 
