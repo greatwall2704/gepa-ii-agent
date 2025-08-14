@@ -1,8 +1,6 @@
 from typing import Any, TypedDict
 
-import litellm
-
-from gepa import EvaluationBatch, GEPAAdapter
+from gepa.core.adapter import EvaluationBatch, GEPAAdapter
 
 
 # DataInst, Trajectory, RolloutOutput
@@ -24,8 +22,10 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
         model: str,
         failure_score: float = 0.0,
     ):
+        import litellm
         self.model = model
         self.failure_score = failure_score
+        self.litellm = litellm
 
     def evaluate(
         self,
@@ -52,7 +52,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             litellm_requests.append(messages)
 
         try:
-            responses = litellm.batch_completion(model=self.model, messages=litellm_requests)
+            responses = self.litellm.batch_completion(model=self.model, messages=litellm_requests)
         except Exception as e:
             raise e
 
