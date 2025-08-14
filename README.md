@@ -25,7 +25,7 @@ This repository provides the official implementation of the GEPA algorithm as pr
 We highly recommend using GEPA from within DSPy as [dspy.GEPA](https://dspy.ai/api/optimizers/GEPA/). If your AI system is built using [DSPy](https://dspy.ai/), GEPA is available as a plug-in optimizer. `dspy.GEPA` tutorials are available at [dspy.GEPA Tutorials](https://dspy.ai/tutorials/gepa_ai_program/).
 
 ### Simple Prompt Optimization Example (without DSPy)
-GEPA is built around a flexible `GEPAAdapter` (src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. In this example, we'll use a simple `DefaultAdapter` (src/gepa/adapters/default_adapter.py) to evolve a system prompt for math problems from the AIME dataset. Here's how to run GEPA for a few iterations. Run the following in an environment with `OPENAI_API_KEY`:
+GEPA is built around a flexible [`GEPAAdapter`](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. In this example, we'll use a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter.py) to evolve a system prompt for math problems from the AIME dataset. Here's how to run GEPA for a few iterations. Run the following in an environment with `OPENAI_API_KEY`:
 ```python
 import gepa
 
