@@ -1,0 +1,115 @@
+from typing import Any, Dict, List, TypedDict
+
+from gepa import EvaluationBatch, GEPAAdapter
+
+import litellm
+
+# DataInst, Trajectory, RolloutOutput
+class DefaultDataInst(TypedDict):
+    input: str
+    additional_context: Dict[str, str]
+    answer: str
+
+class DefaultTrajectory(TypedDict):
+    data: DefaultDataInst
+    full_assistant_response: str
+
+class DefaultRolloutOutput(TypedDict):
+    full_assistant_response: str
+
+class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRolloutOutput]):
+    def __init__(
+        self,
+        model: str,
+        failure_score: float = 0.0,
+    ):
+        self.model = model
+        self.failure_score = failure_score
+
+    def evaluate(
+        self,
+        batch: List[DefaultDataInst],
+        candidate: Dict[str, str],
+        capture_traces: bool = False,
+    ) -> EvaluationBatch[DefaultTrajectory, DefaultRolloutOutput]:
+        outputs: List[DefaultRolloutOutput] = []
+        scores: List[float] = []
+        trajectories: List[DefaultTrajectory] | None = [] if capture_traces else None
+
+        system_content = list(candidate.values())[0]
+
+        litellm_requests = []
+        
+        for data in batch:
+            user_content = f"{data['input']}"
+
+            messages = [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_content},
+            ]
+
+            litellm_requests.append(messages)
+        
+        try:
+            responses = litellm.batch_completion(model=self.model, messages=litellm_requests)
+        except Exception as e:
+            raise e
+
+        for data, response in zip(batch, responses):
+            assistant_response = response.choices[0].message.content.strip()
+
+            output = {"full_assistant_response": assistant_response}
+            score = 1.0 if data["answer"] in assistant_response else 0.0
+
+            outputs.append(output)
+            scores.append(score)
+
+            if capture_traces:
+                trajectories.append(
+                    {
+                        "data": data,
+                        "full_assistant_response": assistant_response,
+                    }
+                )
+
+        return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
+
+    def make_reflective_dataset(
+        self,
+        candidate: Dict[str, str],
+        eval_batch: EvaluationBatch[DefaultTrajectory, DefaultRolloutOutput],
+        components_to_update: List[str],
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        ret_d: Dict[str, List[Dict[str, Any]]] = {}
+        
+        assert len(components_to_update) == 1       
+        comp = components_to_update[0]
+        
+        items: List[Dict[str, Any]] = []
+        trace_instances = list(zip(eval_batch.trajectories, eval_batch.scores, eval_batch.outputs))
+
+        for trace_instance in trace_instances:
+            traj, score, _ = trace_instance
+            data = traj["data"]
+            generated_outputs = traj["full_assistant_response"]
+
+            if score > 0.0:
+                feedback = f"The generated response is correct. The response include the correct answer '{data['answer']}'"
+            else:
+                additional_context_str = "\n".join(f"{k}: {v}" for k, v in data["additional_context"].items())
+                feedback = f"The generated response is incorrect. The correct answer is '{data['answer']}'. Ensure that the correct answer is included in the response exactly as it is. Here is some additional context that might be helpful:\n{additional_context_str}"
+
+            d = {
+                "Inputs": data["input"],
+                "Generated Outputs": generated_outputs,
+                "Feedback": feedback,
+            }
+            
+            items.append(d)
+
+        ret_d[comp] = items
+
+        if len(items) == 0:
+            raise Exception("No valid predictions found for any module.")
+
+        return ret_d

@@ -1,5 +1,6 @@
 import random
 from typing import Any, Dict, List, Optional
+from gepa.adapters.default_adapter import DefaultAdapter
 from gepa.core.adapter import DataInst, RolloutOutput, GEPAAdapter, Trajectory
 from gepa.core.engine import GEPAEngine
 from gepa.core.result import GEPAResult
@@ -16,9 +17,10 @@ def optimize(
     trainset: List[DataInst],
     valset: Optional[List[DataInst]] = None,
     adapter: Optional[GEPAAdapter[DataInst, Trajectory, RolloutOutput]] = None,
-    
+    task_lm: Optional[str] = None,
+
     # Reflection-based configuration
-    reflection_lm: Optional[LanguageModel] = None,
+    reflection_lm: Optional[LanguageModel | str] = None,
     candidate_selection_strategy: str = "pareto",
     skip_perfect_score=True,
     reflection_minibatch_size=3,
@@ -82,8 +84,9 @@ def optimize(
     - seed_candidate: The initial candidate to start with.
     - trainset: The training set to use for reflective updates.
     - valset: The validation set to use for tracking Pareto scores. If not provided, GEPA will use the trainset for both.
-    - adapter: A `GEPAAdapter` instance that implements the adapter interface. This allows GEPA to plug into your system's environment.
-    
+    - adapter: A `GEPAAdapter` instance that implements the adapter interface. This allows GEPA to plug into your system's environment. If not provided, GEPA will use a default adapter: `gepa.adapters.default_adapter.DefaultAdapter`, with model defined by `task_lm`.
+    - task_lm: Optional. The model to use for the task. This is only used if `adapter` is not provided, and is used to initialize the default adapter.
+
     # Reflection-based configuration
     - reflection_lm: A `LanguageModel` instance that is used to reflect on the performance of the candidate program.
     - candidate_selection_strategy: The strategy to use for selecting the candidate to update.
@@ -110,10 +113,19 @@ def optimize(
     # Reproducibility
     - seed: The seed to use for the random number generator.
     """
-    assert adapter is not None, "GEPA currently requires an adapter to be provided. We will soon support simpler application without an adapter."
+    if adapter is None:
+        assert task_lm is not None, "Since no adapter is provided, GEPA requires a task LM to be provided. Please set the `task_lm` parameter."
+        adapter = DefaultAdapter(model=task_lm)
+    else:
+        assert task_lm is None, "Since an adapter is provided, GEPA does not require a task LM to be provided. Please set the `task_lm` parameter to None."
+
     assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
         f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
     assert reflection_lm is not None, "GEPA currently requires a reflection LM to be provided. We will soon support simpler application without specifying a reflection LM."
+
+    if isinstance(reflection_lm, str):
+        import litellm
+        reflection_lm = lambda prompt: litellm.completion(model=reflection_lm, messages=[{"role": "user", "content": prompt}]).choices[0].message.content
 
     if logger is None:
         logger = StdOutLogger()
