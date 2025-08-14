@@ -61,7 +61,7 @@ print("GEPA Optimized Prompt:", gepa_result.best_candidate['system_prompt'])
 
 Here, we can see the optimized prompt that GEPA generates for AIME, which achieves upto 10% improvement in the performance of GPT-4.1 Mini on AIME 2025. Note the details captured in the prompts in just 2 iterations of GEPA. GEPA can be thought of as precomputing some reasoning (during optimization) to come up with a good plan for future task instances.
 
-<img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="GEPA Logo" width="900">
+<img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="900">
 <details>
 <summary><mark>Click to view full prompt</mark></summary>
 
