@@ -28,3 +28,60 @@ dspy = []
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+include = ["src/**/*.py"]
+line-length = 120
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "RUF", # ruff-specific rules
+    "Q",   # flake8-quotes
+]
+ignore = [
+    "B027",  # Allow non-abstract empty methods in abstract base classes
+    "FBT003",# Allow boolean positional values in function calls
+    "C901",  # Ignore complexity checking
+    "E501",  # Ignore line length errors (handled by formatter)
+    "UP035", # Allow python typing modules
+    "RUF005", # Allow using + operator to concatenate collections
+    "B904", # Allow raise custom exceptions in except blocks
+    "F403", # Allow wildcard imports
+    "E721", # Allow using == to compare with type
+    "UP031", # Allow percent format
+    "RUF022", # Allow unsorted __all__ value
+]
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+docstring-code-format = false
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["gepa"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # Allow assert statements in tests
+    "TID252",  # Allow relative imports in tests
+    "ARG001",  # Allow unused arguments in tests (like pytest fixtures)
+]
+"__init__.py" = ["F401"]  # Init files can be empty

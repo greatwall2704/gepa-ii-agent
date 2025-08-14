@@ -2,6 +2,7 @@
 from gepa.core.state import GEPAState
 from gepa.gepa_utils import idxmax
 
+
 def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAState, valset_score, new_program_idx, valset_subscores, use_wandb, linear_pareto_front_program_idx):
     best_prog_as_per_agg_score = idxmax(gepa_state.per_program_tracked_scores)
     best_prog_as_per_agg_score_valset = idxmax(gepa_state.program_full_scores_val_set)
@@ -38,5 +39,5 @@ def log_detailed_metrics_after_discovering_new_program(logger, gepa_state: GEPAS
     }
 
     if use_wandb:
-        import wandb # type: ignore
+        import wandb  # type: ignore
         wandb.log(wandb_logs, step=gepa_state.i+1)

@@ -1,4 +1,4 @@
-from typing import List
+
 
 def json_default(x):
     """Default JSON encoder for objects that are not serializable by default."""
@@ -7,7 +7,7 @@ def json_default(x):
     except:
         return repr(x)
 
-def idxmax(lst: List[float]) -> int:
+def idxmax(lst: list[float]) -> int:
     """Return the index of the maximum value in a list."""
     max_val = max(lst)
     return lst.index(max_val)
@@ -22,7 +22,7 @@ def is_dominated(y, programs, program_at_pareto_front_valset):
                 break
         if not found_dominator_in_front:
             return False
-    
+
     return True
 
 def remove_dominated_programs(program_at_pareto_front_valset, scores=None):
@@ -35,8 +35,8 @@ def remove_dominated_programs(program_at_pareto_front_valset, scores=None):
     programs = list(freq.keys())
 
     if scores is None:
-        scores = {p:1 for p in programs}
-    
+        scores = dict.fromkeys(programs, 1)
+
     programs = sorted(programs, key=lambda x: scores[x], reverse=False)
 
     found_to_remove = True
@@ -49,14 +49,14 @@ def remove_dominated_programs(program_at_pareto_front_valset, scores=None):
                 dominated.add(y)
                 found_to_remove = True
                 break
-    
+
     dominators = [p for p in programs if p not in dominated]
     for front in program_at_pareto_front_valset:
         assert any(p in front for p in dominators)
-    
+
     new_program_at_pareto_front_valset = [{prog_idx for prog_idx in front if prog_idx in dominators} for front in program_at_pareto_front_valset]
     assert len(new_program_at_pareto_front_valset) == len(program_at_pareto_front_valset)
-    for front_old, front_new in zip(program_at_pareto_front_valset, new_program_at_pareto_front_valset):
+    for front_old, front_new in zip(program_at_pareto_front_valset, new_program_at_pareto_front_valset, strict=False):
         assert front_new.issubset(front_old)
 
     return new_program_at_pareto_front_valset
@@ -79,7 +79,7 @@ def select_program_candidate_from_pareto_front(pareto_front_programs, train_val_
             if prog_idx not in program_frequency_in_validation_pareto_front:
                 program_frequency_in_validation_pareto_front[prog_idx] = 0
             program_frequency_in_validation_pareto_front[prog_idx] += 1
-    
+
     sampling_list = [prog_idx for prog_idx, freq in program_frequency_in_validation_pareto_front.items() for _ in range(freq)]
     assert len(sampling_list) > 0
     curr_prog_id = rng.choice(sampling_list)

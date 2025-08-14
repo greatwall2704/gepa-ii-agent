@@ -1,13 +1,14 @@
-from typing import Any, Dict, List, TypedDict
+from typing import Any, TypedDict
+
+import litellm
 
 from gepa import EvaluationBatch, GEPAAdapter
 
-import litellm
 
 # DataInst, Trajectory, RolloutOutput
 class DefaultDataInst(TypedDict):
     input: str
-    additional_context: Dict[str, str]
+    additional_context: dict[str, str]
     answer: str
 
 class DefaultTrajectory(TypedDict):
@@ -28,18 +29,18 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
 
     def evaluate(
         self,
-        batch: List[DefaultDataInst],
-        candidate: Dict[str, str],
+        batch: list[DefaultDataInst],
+        candidate: dict[str, str],
         capture_traces: bool = False,
     ) -> EvaluationBatch[DefaultTrajectory, DefaultRolloutOutput]:
-        outputs: List[DefaultRolloutOutput] = []
-        scores: List[float] = []
-        trajectories: List[DefaultTrajectory] | None = [] if capture_traces else None
+        outputs: list[DefaultRolloutOutput] = []
+        scores: list[float] = []
+        trajectories: list[DefaultTrajectory] | None = [] if capture_traces else None
 
         system_content = list(candidate.values())[0]
 
         litellm_requests = []
-        
+
         for data in batch:
             user_content = f"{data['input']}"
 
@@ -49,13 +50,13 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             ]
 
             litellm_requests.append(messages)
-        
+
         try:
             responses = litellm.batch_completion(model=self.model, messages=litellm_requests)
         except Exception as e:
             raise e
 
-        for data, response in zip(batch, responses):
+        for data, response in zip(batch, responses, strict=False):
             assistant_response = response.choices[0].message.content.strip()
 
             output = {"full_assistant_response": assistant_response}
@@ -76,17 +77,17 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
 
     def make_reflective_dataset(
         self,
-        candidate: Dict[str, str],
+        candidate: dict[str, str],
         eval_batch: EvaluationBatch[DefaultTrajectory, DefaultRolloutOutput],
-        components_to_update: List[str],
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        ret_d: Dict[str, List[Dict[str, Any]]] = {}
-        
-        assert len(components_to_update) == 1       
+        components_to_update: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
+        ret_d: dict[str, list[dict[str, Any]]] = {}
+
+        assert len(components_to_update) == 1
         comp = components_to_update[0]
-        
-        items: List[Dict[str, Any]] = []
-        trace_instances = list(zip(eval_batch.trajectories, eval_batch.scores, eval_batch.outputs))
+
+        items: list[dict[str, Any]] = []
+        trace_instances = list(zip(eval_batch.trajectories, eval_batch.scores, eval_batch.outputs, strict=False))
 
         for trace_instance in trace_instances:
             traj, score, _ = trace_instance
@@ -104,7 +105,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
                 "Generated Outputs": generated_outputs,
                 "Feedback": feedback,
             }
-            
+
             items.append(d)
 
         ret_d[comp] = items

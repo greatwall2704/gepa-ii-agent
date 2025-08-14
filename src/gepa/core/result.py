@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Set, Tuple
+from typing import Any, Generic
 
 from gepa.core.adapter import RolloutOutput
+
 
 @dataclass(frozen=True)
 class GEPAResult(Generic[RolloutOutput]):
@@ -36,21 +37,21 @@ class GEPAResult(Generic[RolloutOutput]):
     - to_dict(...), save_json(...): serialization helpers
     """
     # Core data
-    candidates: List[Dict[str, str]]
-    parents: List[List[Optional[int]]]
-    val_aggregate_scores: List[float]
-    val_subscores: List[List[float]]
-    per_val_instance_best_candidates: List[Set[int]]
-    discovery_eval_counts: List[int]
+    candidates: list[dict[str, str]]
+    parents: list[list[int | None]]
+    val_aggregate_scores: list[float]
+    val_subscores: list[list[float]]
+    per_val_instance_best_candidates: list[set[int]]
+    discovery_eval_counts: list[int]
 
     # Optional data
-    best_outputs_valset: Optional[List[List[Tuple[int, List[RolloutOutput]]]]] = None
+    best_outputs_valset: list[list[tuple[int, list[RolloutOutput]]]] | None = None
 
     # Run metadata (optional)
-    total_metric_calls: Optional[int] = None
-    num_full_val_evals: Optional[int] = None
-    run_dir: Optional[str] = None
-    seed: Optional[int] = None
+    total_metric_calls: int | None = None
+    num_full_val_evals: int | None = None
+    run_dir: str | None = None
+    seed: int | None = None
 
     # -------- Convenience properties --------
     @property
@@ -67,10 +68,10 @@ class GEPAResult(Generic[RolloutOutput]):
         return max(range(len(scores)), key=lambda i: scores[i])
 
     @property
-    def best_candidate(self) -> Dict[str, str]:
+    def best_candidate(self) -> dict[str, str]:
         return self.candidates[self.best_idx]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         cands = [
             {k: v for k, v in cand.items()}
             for cand in self.candidates
@@ -92,7 +93,7 @@ class GEPAResult(Generic[RolloutOutput]):
         )
 
     @staticmethod
-    def from_state(state: Any, run_dir: Optional[str] = None, seed: Optional[int] = None) -> "GEPAResult":
+    def from_state(state: Any, run_dir: str | None = None, seed: int | None = None) -> "GEPAResult":
         """
         Build a GEPAResult from a GEPAState.
         """

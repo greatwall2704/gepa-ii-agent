@@ -1,5 +1,6 @@
-from typing import Dict
+
 from gepa.proposer.reflective_mutation.base import Signature
+
 
 class InstructionProposalSignature(Signature):
     prompt_template = """I provided an assistant with the following instructions to perform a task for me:
@@ -24,7 +25,7 @@ Provide the new instructions within ``` blocks."""
     output_keys = ["new_instruction"]
 
     @classmethod
-    def prompt_renderer(cls, input_dict: Dict[str, str]) -> str:
+    def prompt_renderer(cls, input_dict: dict[str, str]) -> str:
         def format_samples(samples):
             def render_value(value, level=3):
                 # level controls markdown header depth (###, ####, etc.)
@@ -54,15 +55,15 @@ Provide the new instructions within ``` blocks."""
                     s += render_value(val, level=3)
                 return s
 
-            return "\n\n".join(convert_sample_to_markdown(sample, i + 1) for i, sample in enumerate(samples))   
+            return "\n\n".join(convert_sample_to_markdown(sample, i + 1) for i, sample in enumerate(samples))
 
         prompt = cls.prompt_template
         prompt = prompt.replace("<curr_instructions>", input_dict["current_instruction_doc"])
         prompt = prompt.replace("<inputs_outputs_feedback>", format_samples(input_dict["dataset_with_feedback"]))
         return prompt
-    
+
     @classmethod
-    def output_extractor(cls, lm_out: str) -> Dict[str, str]:
+    def output_extractor(cls, lm_out: str) -> dict[str, str]:
         # Extract ``` blocks
         new_instruction = None
         if lm_out.count("```") >= 2:
@@ -80,6 +81,6 @@ Provide the new instructions within ``` blocks."""
                 lm_out = lm_out[3:]
             if lm_out.endswith("```"):
                 lm_out = lm_out[:-3]
-            new_instruction = lm_out 
+            new_instruction = lm_out
 
         return {"new_instruction": new_instruction}

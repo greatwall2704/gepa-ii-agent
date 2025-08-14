@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Optional, Protocol, TypeVar, Generic
 from dataclasses import dataclass
+from typing import Any, Generic, Protocol, TypeVar
 
 # Generic type aliases matching your original
-RolloutOutput = TypeVar('RolloutOutput')
-Trajectory = TypeVar('Trajectory')
-DataInst = TypeVar('DataInst')
+RolloutOutput = TypeVar("RolloutOutput")
+Trajectory = TypeVar("Trajectory")
+DataInst = TypeVar("DataInst")
 
 @dataclass
 class EvaluationBatch(Generic[Trajectory, RolloutOutput]):
@@ -19,17 +19,17 @@ class EvaluationBatch(Generic[Trajectory, RolloutOutput]):
       a reflective dataset (See `GEPAAdapter.make_reflective_dataset`). If capture_traces=True is passed to `evaluate`, trajectories
       should be provided and align one-to-one with `outputs` and `scores`.
     """
-    outputs: List[RolloutOutput]
-    scores: List[float]
-    trajectories: Optional[List[Trajectory]] = None
+    outputs: list[RolloutOutput]
+    scores: list[float]
+    trajectories: list[Trajectory] | None = None
 
 class ProposalFn(Protocol):
     def __call__(
         self,
-        candidate: Dict[str, str],
-        reflective_dataset: Dict[str, List[Dict[str, Any]]],
-        components_to_update: List[str],
-    ) -> Dict[str, str]:
+        candidate: dict[str, str],
+        reflective_dataset: dict[str, list[dict[str, Any]]],
+        components_to_update: list[str],
+    ) -> dict[str, str]:
         """
         - Given the current `candidate`, a reflective dataset (as returned by
           `GEPAAdapter.make_reflective_dataset`), and a list of component names to update,
@@ -93,8 +93,8 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
 
     def evaluate(
         self,
-        batch: List[DataInst],
-        candidate: Dict[str, str],
+        batch: list[DataInst],
+        candidate: dict[str, str],
         capture_traces: bool = False,
     ) -> EvaluationBatch[Trajectory, RolloutOutput]:
         """
@@ -133,10 +133,10 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
 
     def make_reflective_dataset(
         self,
-        candidate: Dict[str, str],
+        candidate: dict[str, str],
         eval_batch: EvaluationBatch[Trajectory, RolloutOutput],
-        components_to_update: List[str],
-    ) -> Dict[str, List[Dict[str, Any]]]:
+        components_to_update: list[str],
+    ) -> dict[str, list[dict[str, Any]]]:
         """
         Build a small, JSON-serializable dataset (per component) to drive instruction
         refinement by a teacher LLM.
@@ -165,4 +165,4 @@ class GEPAAdapter(Protocol[DataInst, Trajectory, RolloutOutput]):
         """
         ...
 
-    propose_new_texts: Optional[ProposalFn] = None
+    propose_new_texts: ProposalFn | None = None

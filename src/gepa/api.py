@@ -1,26 +1,28 @@
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from gepa.adapters.default_adapter import DefaultAdapter
-from gepa.core.adapter import DataInst, RolloutOutput, GEPAAdapter, Trajectory
+from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
 from gepa.core.engine import GEPAEngine
 from gepa.core.result import GEPAResult
 from gepa.logging.logger import LoggerProtocol, StdOutLogger
+from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.base import LanguageModel
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
-from gepa.proposer.merge import MergeProposer
-from gepa.strategies.candidate_selector import ParetoCandidateSelector, CurrentBestCandidateSelector
 from gepa.strategies.batch_sampler import EpochShuffledBatchSampler
+from gepa.strategies.candidate_selector import CurrentBestCandidateSelector, ParetoCandidateSelector
 from gepa.strategies.component_selector import RoundRobinReflectionComponentSelector
 
+
 def optimize(
-    seed_candidate: Dict[str, str],
-    trainset: List[DataInst],
-    valset: Optional[List[DataInst]] = None,
-    adapter: Optional[GEPAAdapter[DataInst, Trajectory, RolloutOutput]] = None,
-    task_lm: Optional[str] = None,
+    seed_candidate: dict[str, str],
+    trainset: list[DataInst],
+    valset: list[DataInst] | None = None,
+    adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
+    task_lm: str | None = None,
 
     # Reflection-based configuration
-    reflection_lm: Optional[LanguageModel | str] = None,
+    reflection_lm: LanguageModel | str | None = None,
     candidate_selection_strategy: str = "pareto",
     skip_perfect_score=True,
     reflection_minibatch_size=3,
@@ -35,11 +37,11 @@ def optimize(
     max_metric_calls=None,
 
     # Logging
-    logger: Optional[LoggerProtocol] = None,
-    run_dir: Optional[str] = None,
+    logger: LoggerProtocol | None = None,
+    run_dir: str | None = None,
     use_wandb: bool = False,
-    wandb_api_key: Optional[str] = None,
-    wandb_init_kwargs: Optional[Dict[str, Any]] = None,
+    wandb_api_key: str | None = None,
+    wandb_init_kwargs: dict[str, Any] | None = None,
     track_best_outputs: bool = False,
 
     # Reproducibility
@@ -165,7 +167,7 @@ def optimize(
             max_merge_invocations=max_merge_invocations,
             rng=rng,
         )
-    
+
     def full_eval(inputs, prog):
         eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
         return eval_out.outputs, eval_out.scores

@@ -1,7 +1,9 @@
-from typing import Protocol, List, Dict, Callable
 from dataclasses import dataclass
-from gepa.core.state import GEPAState
+from typing import Callable, Protocol
+
 from gepa.core.adapter import Trajectory
+from gepa.core.state import GEPAState
+
 
 class CandidateSelector(Protocol):
     def select_candidate_idx(self, state: GEPAState) -> int:
@@ -11,15 +13,15 @@ class ReflectionComponentSelector(Protocol):
     def select_modules(
         self,
         state: GEPAState,
-        trajectories: List[Trajectory],
-        subsample_scores: List[float],
+        trajectories: list[Trajectory],
+        subsample_scores: list[float],
         candidate_idx: int,
-        candidate: Dict[str, str],
-    ) -> List[str]:
+        candidate: dict[str, str],
+    ) -> list[str]:
         ...
 
 class BatchSampler(Protocol):
-    def next_minibatch_indices(self, trainset_size: int, iteration: int) -> List[int]:
+    def next_minibatch_indices(self, trainset_size: int, iteration: int) -> list[int]:
         ...
 
 class LanguageModel(Protocol):
@@ -29,13 +31,13 @@ class LanguageModel(Protocol):
 @dataclass
 class Signature:
     prompt_template: str
-    input_keys: List[str]
-    output_keys: List[str]
-    prompt_renderer: Callable[[Dict[str, str]], str]
-    output_extractor: Callable[[str], Dict[str, str]]
+    input_keys: list[str]
+    output_keys: list[str]
+    prompt_renderer: Callable[[dict[str, str]], str]
+    output_extractor: Callable[[str], dict[str, str]]
 
     @classmethod
-    def run(cls, lm: LanguageModel, input_dict: Dict[str, str]) -> Dict[str, str]:
+    def run(cls, lm: LanguageModel, input_dict: dict[str, str]) -> dict[str, str]:
         full_prompt = cls.prompt_renderer(input_dict)
         lm_out = lm(full_prompt).strip()
         return cls.output_extractor(lm_out)

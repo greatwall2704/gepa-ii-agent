@@ -1,10 +1,15 @@
-from typing import Any, Dict, List, Optional
-from gepa.core.adapter import DataInst, Trajectory, RolloutOutput
-from gepa.proposer.base import ProposeNewCandidate
+from typing import Any
+
+from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
 from gepa.core.state import GEPAState
-from gepa.core.adapter import GEPAAdapter
-from gepa.proposer.base import CandidateProposal
-from gepa.proposer.reflective_mutation.base import BatchSampler, CandidateSelector, LanguageModel, ReflectionComponentSelector
+from gepa.proposer.base import CandidateProposal, ProposeNewCandidate
+from gepa.proposer.reflective_mutation.base import (
+    BatchSampler,
+    CandidateSelector,
+    LanguageModel,
+    ReflectionComponentSelector,
+)
+
 
 class ReflectiveMutationProposer(ProposeNewCandidate):
     """
@@ -20,7 +25,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
     def __init__(
         self,
         logger: Any,
-        trainset: List[DataInst],
+        trainset: list[DataInst],
         adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput],
         candidate_selector: CandidateSelector,
         module_selector: ReflectionComponentSelector,
@@ -28,7 +33,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         perfect_score: float,
         skip_perfect_score: bool,
         use_wandb: bool,
-        reflection_lm: Optional[LanguageModel] = None,
+        reflection_lm: LanguageModel | None = None,
     ):
         self.logger = logger
         self.trainset = trainset
@@ -43,15 +48,15 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
 
     def propose_new_texts(
         self,
-        candidate: Dict[str, str], 
-        reflective_dataset: Dict[str, List[Dict[str, Any]]], 
-        components_to_update: List[str]
-    ) -> Dict[str, str]:
+        candidate: dict[str, str],
+        reflective_dataset: dict[str, list[dict[str, Any]]],
+        components_to_update: list[str]
+    ) -> dict[str, str]:
         if self.adapter.propose_new_texts is not None:
             return self.adapter.propose_new_texts(candidate, reflective_dataset, components_to_update)
 
         from gepa.strategies.instruction_proposal import InstructionProposalSignature
-        new_texts: Dict[str, str] = {}
+        new_texts: dict[str, str] = {}
         for name in components_to_update:
             base_instruction = candidate[name]
             dataset_with_feedback = reflective_dataset[name]
@@ -61,15 +66,15 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
                     "current_instruction_doc": base_instruction,
                     "dataset_with_feedback": dataset_with_feedback
                 }
-            )['new_instruction']
+            )["new_instruction"]
         return new_texts
 
-    def propose(self, state: GEPAState) -> Optional[CandidateProposal]:
+    def propose(self, state: GEPAState) -> CandidateProposal | None:
         i = state.i + 1
 
         curr_prog_id = self.candidate_selector.select_candidate_idx(state)
         curr_prog = state.program_candidates[curr_prog_id]
-        state.full_program_trace[-1]['selected_program_candidate'] = curr_prog_id
+        state.full_program_trace[-1]["selected_program_candidate"] = curr_prog_id
         self.logger.log(f"Iteration {i}: Selected program {curr_prog_id} score: {state.per_program_tracked_scores[curr_prog_id]}")
 
         if self.use_wandb:
@@ -77,7 +82,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
             wandb.log({"iteration": i, "selected_program_candidate": curr_prog_id}, step=i)
 
         subsample_ids = self.batch_sampler.next_minibatch_indices(len(self.trainset), i-1)
-        state.full_program_trace[-1]['subsample_ids'] = subsample_ids
+        state.full_program_trace[-1]["subsample_ids"] = subsample_ids
         minibatch = [self.trainset[j] for j in subsample_ids]
 
         # 1) Evaluate current program with traces
@@ -87,7 +92,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
             return None
 
         state.total_num_evals += len(subsample_ids)
-        state.full_program_trace[-1]['subsample_scores'] = eval_curr.scores
+        state.full_program_trace[-1]["subsample_scores"] = eval_curr.scores
 
         if self.skip_perfect_score and all(s >= self.perfect_score for s in eval_curr.scores):
             self.logger.log(f"Iteration {i}: All subsample scores perfect. Skipping.")
@@ -129,7 +134,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
 
         eval_new = self.adapter.evaluate(minibatch, new_candidate, capture_traces=False)
         state.total_num_evals += len(subsample_ids)
-        state.full_program_trace[-1]['new_subsample_scores'] = eval_new.scores
+        state.full_program_trace[-1]["new_subsample_scores"] = eval_new.scores
 
         new_sum = sum(eval_new.scores)
         if self.use_wandb:

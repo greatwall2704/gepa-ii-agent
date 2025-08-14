@@ -1,11 +1,12 @@
-from typing import Optional
 import random
+
 from gepa.core.state import GEPAState
-from gepa.proposer.reflective_mutation.base import CandidateSelector
 from gepa.gepa_utils import idxmax, select_program_candidate_from_pareto_front
+from gepa.proposer.reflective_mutation.base import CandidateSelector
+
 
 class ParetoCandidateSelector(CandidateSelector):
-    def __init__(self, rng: Optional[random.Random]):
+    def __init__(self, rng: random.Random | None):
         if rng is None:
             self.rng = random.Random(0)
         else:

@@ -1,8 +1,9 @@
-from typing import Union, Optional, Dict, Any
+from typing import Any
 
-def initialize_wandb(wandb_api_key: Union[str, None] = None, wandb_init_kwargs: Optional[Dict[str, Any]] = None):
+
+def initialize_wandb(wandb_api_key: str | None = None, wandb_init_kwargs: dict[str, Any] | None = None):
     try:
-        import wandb # type: ignore
+        import wandb  # type: ignore
         if wandb_api_key:
             wandb.login(key=wandb_api_key, verify=True)
         else:

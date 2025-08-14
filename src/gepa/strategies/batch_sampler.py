@@ -1,7 +1,8 @@
-from typing import List, Optional
 import random
 from collections import Counter
+
 from gepa.proposer.reflective_mutation.base import BatchSampler
+
 
 class EpochShuffledBatchSampler(BatchSampler):
     """
@@ -10,9 +11,9 @@ class EpochShuffledBatchSampler(BatchSampler):
     - Pad to minibatch size with least frequent ids
     - Deterministic via state.rng1
     """
-    def __init__(self, minibatch_size: int, rng: Optional[random.Random] = None):
+    def __init__(self, minibatch_size: int, rng: random.Random | None = None):
         self.minibatch_size = minibatch_size
-        self.shuffled_ids: List[int] = []
+        self.shuffled_ids: list[int] = []
         self.epoch = -1
         self.id_freqs = Counter()
         if rng is None:
@@ -34,7 +35,7 @@ class EpochShuffledBatchSampler(BatchSampler):
                 self.shuffled_ids.append(selected_id)
                 self.id_freqs[selected_id] += 1
 
-    def next_minibatch_indices(self, trainset_size: int, iteration: int) -> List[int]:
+    def next_minibatch_indices(self, trainset_size: int, iteration: int) -> list[int]:
         base_idx = iteration * self.minibatch_size
         curr_epoch = 0 if self.epoch == -1 else base_idx // max(len(self.shuffled_ids), 1)
         if curr_epoch > self.epoch:
