@@ -36,7 +36,7 @@ pip install git+https://github.com/gepa-ai/gepa.git
 > **The easiest and most powerful way to use GEPA for prompt optimization is within [DSPy](https://dspy.ai/), where the GEPA algorithm is directly available through the `dspy.GEPA` API. Directly executable tutorial notebooks are at [dspy.GEPA Tutorials](https://dspy.ai/tutorials/gepa_ai_program/).**
 
 ### Simple Prompt Optimization Example
-GEPA can be run in just a few lines of code. In this example, we'll use GEPA to optimize a system prompt for math problems from the AIME benchmark. Run the following in an environment with `OPENAI_API_KEY`:
+GEPA can be run in just a few lines of code. In this example, we'll use GEPA to optimize a system prompt for math problems from the AIME benchmark ([full tutorial](https://dspy.ai/tutorials/gepa_aime/)). Run the following in an environment with `OPENAI_API_KEY`:
 ```python
 import gepa
 
@@ -59,11 +59,13 @@ gepa_result = gepa.optimize(
 print("GEPA Optimized Prompt:", gepa_result.best_candidate['system_prompt'])
 ```
 
-Here, we can see the optimized prompt that GEPA generates for AIME, which achieves upto 10% improvement in the performance of GPT-4.1 Mini on AIME 2025. Note the details captured in the prompts in just 2 iterations of GEPA:
+Here, we can see the optimized prompt that GEPA generates for AIME, which achieves upto 10% improvement in the performance of GPT-4.1 Mini on AIME 2025. Note the details captured in the prompts in just 2 iterations of GEPA. GEPA can be thought of as precomputing some reasoning (during optimization) to come up with a good plan for future task instances.
 
-<div style="height: 300px; overflow-y: scroll; border: 3px solid #ddd; padding: 10px; background-color: #f9fff9; margin: 10px;">
+<img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="GEPA Logo" width="900">
+<details>
+<summary><mark>Click to view full prompt</mark></summary>
 
-<b>GEPA generated prompt for AIME:</b>
+<mark>[Prompt Begin]</mark>
 
 You will be given one math problem as plain text under a key like “problem.” Your job is to solve it correctly and return:
 
@@ -146,7 +148,9 @@ Quality checks:
 Finally:
 - Put the clean final numeric result in the “answer” field only.
 
-</div>
+<mark>[Prompt End]</mark>
+</details>
+
 <br/>
 
 GEPA is built around a flexible [GEPAAdapter](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. The above example used a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter.py) that plugs into a single-turn LLM environment and evolves system prompts, where tasks are presented as user messages. GEPA can be easily extended to multi-turn and other agentic settings. For example, the `dspy.GEPA` integration uses a [DSPyAdapter](https://github.com/stanfordnlp/dspy/blob/main/dspy/teleprompt/gepa/gepa_utils.py#L51).
