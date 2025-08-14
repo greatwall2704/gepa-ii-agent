@@ -25,7 +25,9 @@ This repository provides the official implementation of the GEPA algorithm as pr
 We highly recommend using GEPA from within DSPy as [dspy.GEPA](https://dspy.ai/api/optimizers/GEPA/). If your AI system is built using [DSPy](https://dspy.ai/), GEPA is available as a plug-in optimizer. `dspy.GEPA` tutorials are available at [dspy.GEPA Tutorials](https://dspy.ai/tutorials/gepa_ai_program/).
 
 ### Simple Prompt Optimization Example (without DSPy)
-GEPA is built around a flexible [`GEPAAdapter`](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. In this example, we'll use a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter.py) to evolve a system prompt for math problems from the AIME dataset. Here's how to run GEPA for a few iterations. Run the following in an environment with `OPENAI_API_KEY`:
+GEPA is built around a flexible [`GEPAAdapter`](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. 
+
+In this example, we'll use GEPA to optimize a system prompt for math problems from the AIME dataset. Run the following in an environment with `OPENAI_API_KEY`:
 ```python
 import gepa
 
@@ -52,16 +54,18 @@ gepa_result = gepa.optimize(
 print("GEPA Optimized Prompt:", gepa_result.best_candidate['system_prompt'])
 ```
 
-### Using GEPA to optimize your system
+The above example used a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter.py) that evolves system prompts, where the tasks are presented as user messages.
+
+### Using GEPA to optimize _your_ system
 
 GEPA can be used to optimize any system consisting of textual components. Follow these steps:
- - **Implement `GEPAAdapter`:** In order to allow the GEPA optimizer to pair with your system and its environment, GEPA requires users to implement the `GEPAAdapter` interface defined in [src/gepa/core/adapter.py](src/gepa/core/adapter.py). `GEPAAdapter` requires 2 methods:
+ - **Implement `GEPAAdapter`:** In order to allow the GEPA optimizer to pair with your system and its environment, users can implement the `GEPAAdapter` interface defined in [src/gepa/core/adapter.py](src/gepa/core/adapter.py). `GEPAAdapter` requires 2 methods:
     - Evaluate: Given a candidate consisting of proposed text components, and a minibatch of inputs sampled from the train/val sets, evaluate and return execution scores, also capturing the system traces.
     - Extract Traces for Reflection: Given the execution traces obtained from executing a proposed candidate, and a named component being optimized, return the textual content from the traces relevant to the named component.
 - **Prepare trainset and valset:** Lists of example inputs and task metadata.
 - **Call `gepa.optimize`** with your adapter, metric, and system configuration.
 
-> We are actively working on implementing various adapters to allow GEPA to integrate into many different frameworks. Please open an issue if there's a specific framework you would like to see supported!
+> We are actively working on implementing adapters to integrate into many different frameworks. Please open an issue if there's a specific framework you would like to see supported!
 
 ## Key Principles
 
@@ -78,7 +82,7 @@ GEPA **tracks and samples candidates for mutation from a Pareto frontier of high
 
 ## What Can GEPA Optimize?
 
-- **Compound LLM programs:** Multi-stage and multi-module LLM systems with orchestrated control flow.
+- **Compound AI Systems:** Multi-stage and multi-module LLM systems with orchestrated control flow (for example, DSPy, LangChain, etc.)
 - **Agents or tools with text instructions:** Any system where text determines behavior (e.g., prompt sets, user guides, modular agent instructions).
 - **Code:** GEPA can be leveraged to evolve critical code snippets against performance and correctness metrics.
 - **Any system whose key behaviors are controlled by editable textual components.**
@@ -94,16 +98,9 @@ GEPA **tracks and samples candidates for mutation from a Pareto frontier of high
 - **Full training and inference-time optimization support.**
 - **Compatible with open, proprietary, or local LLMs.**
 
-## Advanced: Customization and Extension
-
-- **Adapters:** Implement the `GEPAAdapter` interface ([src/gepa/core/adapter.py](src/gepa/core/adapter.py)) to plug GEPA into your system/environment.
-- **Candidate and Module Selectors:** Swap out candidate and component selection logic to bias toward different exploration/exploitation balances (see [src/gepa/proposer/reflective_mutation/base.py](src/gepa/proposer/reflective_mutation/base.py) and [src/gepa/strategies/](src/gepa/strategies/)).
-- **Reflection Prompts:** Customize the prompt templates or output extractors for new component types or domains (see [src/gepa/strategies/instruction_proposal.py](src/gepa/strategies/instruction_proposal.py)).
-- **Feedback Engineering:** Maximize impact by designing evaluation metrics and feedback traces that provide the most actionable information.
-
 # Contributions
 
-We encourage the community and users to help us develop adapters to allow GEPA to be used for optimizing all kinds of systems leveraging textual components. Refer to [DSPy/GEPAAdapter](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) for an example `GEPAAdapter` implementation.
+We encourage the community and users to help us develop adapters to allow GEPA to be used for optimizing all kinds of systems leveraging textual components. Refer to [DSPy/GEPAAdapter](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) and [src/gepa/adapters/](src/gepa/adapters/) for example `GEPAAdapter` implementations.
 
 ## Reference & Citation
 
