@@ -72,8 +72,8 @@ Here, we can see the optimized prompt that GEPA generates for AIME, which achiev
     <td align="center">AIME Prompt</td>
   </tr>
   <tr>
-    <td width="52.5%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/gepa_prompt_hotpotqa.png" alt="AIME Prompt" width="1400"></td>
-    <td width="47.5%"><img src="assets/aime_prompt.png" alt="AIME Prompt" width="2500"></td>
+    <td width="52.5%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/gepa_prompt_hotpotqa.png" alt="HotpotQA Prompt" width="1400"></td>
+    <td width="47.5%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="2500"></td>
   </tr>
 </table>
 
