@@ -12,7 +12,7 @@
 
 ## Overview
 
-**GEPA** (Genetic-Pareto) is a novel, sample-efficient framework for **optimizing arbitrary systems composed of text components**—like AI prompts, code snippets, or textual specs—against any evaluation metric. It employs LLMs to reflect on system behavior, using feedback from execution and evaluation traces to drive targeted improvements. Through iterative mutation, reflection, and Pareto-aware candidate selection, GEPA evolves robust, high-performing variants with minimal evaluations, co-evolving multiple components in modular systems for domain-specific gains.
+**GEPA** (Genetic-Pareto) is a framework for **optimizing arbitrary systems composed of text components**—like AI prompts, code snippets, or textual specs—against any evaluation metric. It employs LLMs to reflect on system behavior, using feedback from execution and evaluation traces to drive targeted improvements. Through iterative mutation, reflection, and Pareto-aware candidate selection, GEPA evolves robust, high-performing variants with minimal evaluations, co-evolving multiple components in modular systems for domain-specific gains.
 
 This repository provides the official implementation of the GEPA algorithm as proposed in the paper titled "GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning" ([https://arxiv.org/abs/2507.19457](https://arxiv.org/abs/2507.19457)). In order to reproduce experiments from the paper, we provide a separate [reproduction artifact](https://github.com/gepa-ai/gepa-artifact).
 
@@ -59,13 +59,28 @@ gepa_result = gepa.optimize(
 print("GEPA Optimized Prompt:", gepa_result.best_candidate['system_prompt'])
 ```
 
-Here, we can see the optimized prompt that GEPA generates for AIME, which achieves upto 10% improvement in the performance of GPT-4.1 Mini on AIME 2025. Note the details captured in the prompts in just 2 iterations of GEPA. GEPA can be thought of as precomputing some reasoning (during optimization) to come up with a good plan for future task instances.
+Here, we can see the optimized prompt that GEPA generates for AIME, which achieves **improves GPT-4.1 Mini's performance from 46.6% to 56.6%, an improvement of 10%** on AIME 2025. Note the details captured in the prompts in just 2 iterations of GEPA. GEPA can be thought of as precomputing some reasoning (during optimization) to come up with a good plan for future task instances.
 
-<img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="900">
+<!-- <img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="900"> -->
+
+<table>
+  <tr>
+  <td colspan="2" align="center">Example GEPA Prompts</td>
+  </tr>
+  <tr>
+    <td align="center">HotpotQA (multi-hop QA) Prompt</td>
+    <td align="center">AIME Prompt</td>
+  </tr>
+  <tr>
+    <td width="40.5%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/gepa_prompt_hotpotqa.png" alt="AIME Prompt" width="1400"></td>
+    <td width="59.5%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="2500"></td>
+  </tr>
+</table>
+
 <details>
-<summary><mark>Click to view full prompt</mark></summary>
+<summary><mark>Click to view the full prompts</mark></summary>
 
-<mark>[Prompt Begin]</mark>
+<mark>[AIME Prompt Begin]</mark>
 
 You will be given one math problem as plain text under a key like “problem.” Your job is to solve it correctly and return:
 
@@ -148,7 +163,55 @@ Quality checks:
 Finally:
 - Put the clean final numeric result in the “answer” field only.
 
-<mark>[Prompt End]</mark>
+<mark>[AIME Prompt End]</mark>
+
+<mark>[HotpotQA Prompt Begin]</mark>
+
+You will be given two input fields: `question` and `summary_1`.
+
+Your task is to generate a new search query (`query`) optimized for the **second hop** of a multi-hop retrieval system. The original user question is typically complex and requires information from multiple documents to answer. The first hop query is the original question used to retrieve an initial set of documents. Your goal is to generate a **second hop query** that retrieves *additional relevant documents* that were *not* found in the first hop but are necessary to answer the original question completely.
+
+Detailed task instructions and hints:
+
+1. **Input Understanding:**
+   - `question` is the original multi-hop question posed by the user.
+   - `summary_1` is a concise summary of information from a document retrieved in the first hop, which partially addresses the question.
+
+2. **Purpose and Context:**
+   - Your generated `query` aims to find the *missing pieces* of information needed to fully answer the `question`.
+   - The multi-hop retrieval system works in stages:
+     - First hop: The original question returns some documents.
+     - Second hop: Your query must help retrieve any *other relevant documents* NOT found in the first hop that hold complementary or broader context necessary for final answer extraction.
+
+3. **Key Observations from Examples and Feedback:**
+   - First-hop documents often cover one entity or aspect in the question.
+   - Remaining relevant documents often involve connected or higher-level concepts mentioned in `summary_1` but not explicitly asked in the original question.
+   - The `query` should be formulated to explicitly target these *missing*, but logically linked, documents.
+   - Avoid merely paraphrasing the original question or restating known facts from `summary_1`.
+   - Instead, infer what broader or related entities/concepts might provide the crucial missing information.
+   - For example, if `summary_1` describes a population for a small civil parish, but the question wants total population of the wider region, your `query` should target that wider region (e.g., "Madeira archipelago population in 2011").
+   - Similarly, if `summary_1` covers a song and the question wants the album it came from, but first hop got song-level documents, your query should retrieve documents about the album itself.
+
+4. **How to Build the Query:**
+   - Identify the entities or topics mentioned in `summary_1` that appear related but different from first-hop documents.
+   - Reframe the query to explicitly mention these broader or related entities connected to the original question.
+   - Include relevant key context from the question to maintain specificity, but shift focus to the missing piece.
+   - The goal is to retrieve documents that link or complement what was retrieved initially.
+
+5. **Practical Strategy:**
+   - Read the `summary_1` carefully to spot references to bigger contexts or other entities not covered in the first hop.
+   - Ask yourself, "What entity or aspect does this summary hint at that could answer the original question but was not found yet?"
+   - Formulate a precise, focused factual query targeting that entity or concept to retrieve the missing documents.
+
+6. **Output:**
+   - Produce only the field `query` as a clear, concise question or keyword phrase designed for efficient retrieval of **second-hop documents**.
+   - Ensure the query relates logically to the original question while targeting the broader or complementary knowledge identified in `summary_1`.
+   - Do **not** include the original question or simply rephrase it.
+   - Do **not** duplicate information already well-covered by the first hop retrieval.
+
+By following these principles, you will help the multi-hop retrieval system find all necessary documents to answer the multi-faceted original question completely.
+
+<mark>[HotpotQA Prompt End]</mark>
 </details>
 
 <br/>
@@ -166,36 +229,9 @@ GEPA can be used to optimize any system consisting of textual components. Follow
 
 > We are actively working on implementing adapters to integrate into many different frameworks. Please open an issue if there's a specific framework you would like to see supported!
 
-## Key Principles
+## How does GEPA work
 
-GEPA is built on three fundamental ideas:
-
-### 1. **Textual Reflection Instead of Blind Mutation**
-Instead of black-box mutation or random evolution, GEPA uses LLMs to **reflect in natural language on the trajectories and outcomes of candidate systems**. This enables targeted, interpretable updates: the LLMs can diagnose failure points, understand context, leverage their vast world-knowledge priors and propose nuanced textual edits grounded in observed behavior.
-
-### 2. **Rich Text Feedback as Optimization Signal**
-GEPA can leverage *any* available textual feedback: not just execution logs from the system itself, but also rich traces from evaluation metrics (e.g., test-case logs, compiler error messages, profiler traces, etc.). This feedback becomes the input for LLM-based reflection, enabling **credit assignment and domain-aware optimization even for complex, multi-component systems**.
-
-### 3. **Pareto-based Evolution of System Candidates**
-GEPA **tracks and samples candidates for mutation from a Pareto frontier of high-performing candidates across all evaluation instances**. This preserves solution diversity, accumulates complementary strategies, and avoids premature convergence—allowing GEPA to stochastically combine and evolve candidates that individually win on different instances.
-
-## What Can GEPA Optimize?
-
-- **Compound AI Systems:** Multi-stage and multi-module LLM systems with orchestrated control flow (for example, DSPy, LangChain, etc.)
-- **Agents or tools with text instructions:** Any system where text determines behavior (e.g., prompt sets, user guides, modular agent instructions).
-- **Code/Algorithms:** GEPA can be leveraged to evolve critical code snippets against performance and correctness metrics.
-- **Any system whose key behaviors are controlled by editable textual components.**
-
-**GEPA is model- and metric-agnostic:** supply any callable system, any evaluation function, and an LLM for reflection.
-
-## Main Features
-
-- **Language-driven reflection for targeted improvement** (LLM proposes new text based on trace and feedback).
-- **Instance-level Pareto-aware candidate management**—systematically explores, tracks, and combines diverse winning strategies.
-- **Rich trace-level feedback**—uses any structured textual feedback from system or evaluator for LLM context.
-- **Interpretable, modular, and extensible**—swappable module and candidate selection strategies, merge/crossover, and reward aggregation.
-- **Full training and inference-time optimization support.**
-- **Compatible with open, proprietary, or local LLMs.**
+GEPA optimizes text components of systems using an evolutionary search algorithm that uses LLM-based text for mutating candidates. Most importantly, GEPA leverages task-specific textual feedback (for example, compiler error messages, profiler performance reports, documentation, etc.) to guide the search process. For further details, refer to the paper: [GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning](https://arxiv.org/abs/2507.19457).
 
 ## Contributions
 
@@ -206,6 +242,8 @@ We encourage the community and users to help us develop adapters to allow GEPA t
 > **GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning**  
 > Lakshya A. Agrawal, Shangyin Tan, Dilara Soylu, Noah Ziems, Rishi Khare, Krista Opsahl-Ong, Arnav Singhvi, Herumb Shandilya, Michael J. Ryan, Meng Jiang, Christopher Potts, Koushik Sen, Alexandros G. Dimakis, Ion Stoica, Dan Klein, Matei Zaharia, Omar Khattab  
 > [arXiv:2507.19457](https://arxiv.org/abs/2507.19457)
+
+To stay up to date or learn more, follow [@LakshyAAAgrawal](https://x.com/LakshyAAAgrawal) and [@lateinteraction](https://twitter.com/lateinteraction) on Twitter.
 
 If you use this repository, or the GEPA algorithm, kindly cite:
 ```
