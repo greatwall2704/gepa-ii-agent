@@ -3,25 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- <title>Math Problem Solving Guidelines</title> -->
     <style>
+        html {
+            background-color: white;
+        }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1;
-            margin: 100px;
-            background-color: #ffffff;
+            background-color: #e9f0ff;
             color: #333;
             max-width: 950px;
             margin: 100px auto;
             padding: 20px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 5px 5px 0 0;
+            border: 0.5px solid #ccc;
         }
         h1 {
             color: #2c3e50;
-            border-bottom: 2px solid #3498db;
             padding-bottom: 5px;
             text-align: center;
+            font-size: 1.1em;
+            margin-top: 0;
+            border-bottom: none;
         }
         h2 {
             color: #34495e;
@@ -41,13 +45,13 @@
             font-size: 0.95em;
         }
         code {
-            background-color: #ecf0f1;
+            background-color: #ffffff;
             padding: 2px 4px;
             border-radius: 4px;
             font-family: 'Courier New', Courier, monospace;
         }
         pre {
-            background-color: #ecf0f1;
+            background-color: #ffffff;
             padding: 15px;
             border-radius: 8px;
             overflow-x: auto;
@@ -60,10 +64,12 @@
             font-style: italic;
             color: #7f8c8d;
         }
+        p {
+            margin: 0;
+        }
     </style>
 </head>
 <body>
-    <!-- <h1>Math Problem Solving Guidelines</h1> -->
     
     <div class="section">
         <p>You will be given one math problem as plain text under a key like “problem.” Your job is to solve it correctly and return:</p>
