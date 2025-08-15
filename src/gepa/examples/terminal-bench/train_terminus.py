@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 
+import litellm
 from terminal_bench.agents.terminus_1 import Terminus
 from terminal_bench.agents.terminus_1 import AgentResult, FailureMode
 from terminal_bench.agents.terminus_1 import Chat
@@ -95,13 +96,22 @@ One thing to be very careful about is handling interactive sessions like less, v
     ]
 
     reflection_lm_name = "openai/gpt-5"
+    reflection_lm = (
+        lambda prompt: litellm.completion(
+            model=reflection_lm_name,
+            messages=[{"role": "user", "content": prompt}],
+            reasoning_effort="high",
+        )
+        .choices[0]
+        .message.content
+    )
 
     optimized_results = optimize(
         seed_candidate={"instruction_prompt": initial_prompt_from_terminus},
         trainset=trainset,
         valset=valset,
         adapter=TerminusAdapter(n_concurrent=args.n_concurrent),
-        reflection_lm=reflection_lm_name,
+        reflection_lm=reflection_lm,
         use_wandb=True,
         max_metric_calls=400,
         reflection_minibatch_size=3,
