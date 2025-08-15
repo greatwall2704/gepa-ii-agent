@@ -236,7 +236,7 @@ GEPA can be used to optimize any system consisting of textual components. Follow
 
 #### Example: Optimizing a multi-turn agent in an external environment: terminal-bench's Terminus agent
 
-Terminal-bench is a benchmark for evaluating the performance of terminal-use agents. In [this script](src/gepa/examples/terminal-bench/train_terminus.py), we use GEPA to optimize the system prompt/terminal-use instruction for the default Terminus agent through a custom `GEPAAdapter` implementation.
+[Terminal-bench](https://www.tbench.ai/) is a benchmark for evaluating the performance of terminal-use agents. [Terminus](https://www.tbench.ai/terminus) is a leading terminal-use agent. In [this script](src/gepa/examples/terminal-bench/train_terminus.py), we use GEPA to optimize the system prompt/terminal-use instruction for the Terminus agent through a custom `GEPAAdapter` implementation.
 
 Note that the terminus agent as well as terminal-bench run in an external environment and is integrated into GEPA via the [`TerminusAdapter`](src/gepa/examples/terminal-bench/train_terminus.py).
 
