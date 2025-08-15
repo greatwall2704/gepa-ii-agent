@@ -254,13 +254,16 @@ GEPA optimizes text components of systems using an evolutionary search algorithm
 
 We encourage the community and users to help us develop adapters to allow GEPA to be used for optimizing all kinds of systems leveraging textual components. Refer to [DSPy/GEPAAdapter](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) and [src/gepa/adapters/](src/gepa/adapters/) for example `GEPAAdapter` implementations. Please feel free to flag any problems faced as issues.
 
-## Reference & Citation
+## Further Reading
 
 > **GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning**  
-> Lakshya A. Agrawal, Shangyin Tan, Dilara Soylu, Noah Ziems, Rishi Khare, Krista Opsahl-Ong, Arnav Singhvi, Herumb Shandilya, Michael J. Ryan, Meng Jiang, Christopher Potts, Koushik Sen, Alexandros G. Dimakis, Ion Stoica, Dan Klein, Matei Zaharia, Omar Khattab  
 > [arXiv:2507.19457](https://arxiv.org/abs/2507.19457)
 
+> While this repository provides a Python framework, checkout [observablehq](https://observablehq.com/@tomlarkworthy/gepa) for a JavaScript implementation of GEPA!
+
 To stay up to date or learn more, follow [@LakshyAAAgrawal](https://x.com/LakshyAAAgrawal) and [@lateinteraction](https://twitter.com/lateinteraction) on Twitter.
+
+## Reference and Citation
 
 If you use this repository, or the GEPA algorithm, kindly cite:
 ```
