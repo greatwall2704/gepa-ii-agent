@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
+# https://github.com/gepa-ai/gepa
+
 from dataclasses import dataclass
 from typing import Any, Generic, Protocol, TypeVar
 

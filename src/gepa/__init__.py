@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
+# https://github.com/gepa-ai/gepa
+
 from .adapters import default_adapter
 from .api import optimize
 from .core.adapter import EvaluationBatch, GEPAAdapter

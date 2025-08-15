@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
+# https://github.com/gepa-ai/gepa
+
 import random
 from typing import Any
 
@@ -127,7 +130,8 @@ def optimize(
 
     if isinstance(reflection_lm, str):
         import litellm
-        reflection_lm = lambda prompt: litellm.completion(model=reflection_lm, messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+        reflection_lm_name = reflection_lm
+        reflection_lm = lambda prompt: litellm.completion(model=reflection_lm_name, messages=[{"role": "user", "content": prompt}]).choices[0].message.content
 
     if logger is None:
         logger = StdOutLogger()

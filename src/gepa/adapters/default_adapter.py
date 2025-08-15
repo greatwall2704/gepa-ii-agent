@@ -1,3 +1,6 @@
+# Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
+# https://github.com/gepa-ai/gepa
+
 from typing import Any, TypedDict
 
 from gepa.core.adapter import EvaluationBatch, GEPAAdapter
@@ -21,11 +24,13 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
         self,
         model: str,
         failure_score: float = 0.0,
+        max_litellm_workers: int = 10,
     ):
         import litellm
         self.model = model
         self.failure_score = failure_score
         self.litellm = litellm
+        self.max_litellm_workers = max_litellm_workers
 
     def evaluate(
         self,
@@ -52,7 +57,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             litellm_requests.append(messages)
 
         try:
-            responses = self.litellm.batch_completion(model=self.model, messages=litellm_requests)
+            responses = self.litellm.batch_completion(model=self.model, messages=litellm_requests, max_workers=self.max_litellm_workers)
         except Exception as e:
             raise e
 
