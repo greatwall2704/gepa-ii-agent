@@ -61,8 +61,6 @@ print("GEPA Optimized Prompt:", gepa_result.best_candidate['system_prompt'])
 
 Here, we can see the optimized prompt that GEPA generates for AIME, which achieves **improves GPT-4.1 Mini's performance from 46.6% to 56.6%, an improvement of 10%** on AIME 2025. Note the details captured in the prompts in just 2 iterations of GEPA. GEPA can be thought of as precomputing some reasoning (during optimization) to come up with a good plan for future task instances.
 
-<!-- <img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="900"> -->
-
 <table>
   <tr>
   <td colspan="2" align="center">Example GEPA Prompts</td>
@@ -72,13 +70,65 @@ Here, we can see the optimized prompt that GEPA generates for AIME, which achiev
     <td align="center">AIME Prompt</td>
   </tr>
   <tr>
-    <td width="52%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/gepa_prompt_hotpotqa.png" alt="HotpotQA Prompt" width="1400"></td>
-    <td width="48%"><img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="2500"></td>
-  </tr>
-</table>
+    <td width="52%" valign="top">
+      <img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/gepa_prompt_hotpotqa.png" alt="HotpotQA Prompt" width="1400">
+      <!-- <td> -->
+      <details>
+<summary><mark>Click to view full HotpotQA prompt</mark></summary>
+<mark>[HotpotQA Prompt Begin]</mark>
 
-<details>
-<summary><mark>Click to view the full prompts</mark></summary>
+You will be given two input fields: `question` and `summary_1`.
+
+Your task is to generate a new search query (`query`) optimized for the **second hop** of a multi-hop retrieval system. The original user question is typically complex and requires information from multiple documents to answer. The first hop query is the original question used to retrieve an initial set of documents. Your goal is to generate a **second hop query** that retrieves *additional relevant documents* that were *not* found in the first hop but are necessary to answer the original question completely.
+
+Detailed task instructions and hints:
+
+1. **Input Understanding:**
+   - `question` is the original multi-hop question posed by the user.
+   - `summary_1` is a concise summary of information from a document retrieved in the first hop, which partially addresses the question.
+
+2. **Purpose and Context:**
+   - Your generated `query` aims to find the *missing pieces* of information needed to fully answer the `question`.
+   - The multi-hop retrieval system works in stages:
+     - First hop: The original question returns some documents.
+     - Second hop: Your query must help retrieve any *other relevant documents* NOT found in the first hop that hold complementary or broader context necessary for final answer extraction.
+
+3. **Key Observations from Examples and Feedback:**
+   - First-hop documents often cover one entity or aspect in the question.
+   - Remaining relevant documents often involve connected or higher-level concepts mentioned in `summary_1` but not explicitly asked in the original question.
+   - The `query` should be formulated to explicitly target these *missing*, but logically linked, documents.
+   - Avoid merely paraphrasing the original question or restating known facts from `summary_1`.
+   - Instead, infer what broader or related entities/concepts might provide the crucial missing information.
+   - For example, if `summary_1` describes a population for a small civil parish, but the question wants total population of the wider region, your `query` should target that wider region (e.g., "Madeira archipelago population in 2011").
+   - Similarly, if `summary_1` covers a song and the question wants the album it came from, but first hop got song-level documents, your query should retrieve documents about the album itself.
+
+4. **How to Build the Query:**
+   - Identify the entities or topics mentioned in `summary_1` that appear related but different from first-hop documents.
+   - Reframe the query to explicitly mention these broader or related entities connected to the original question.
+   - Include relevant key context from the question to maintain specificity, but shift focus to the missing piece.
+   - The goal is to retrieve documents that link or complement what was retrieved initially.
+
+5. **Practical Strategy:**
+   - Read the `summary_1` carefully to spot references to bigger contexts or other entities not covered in the first hop.
+   - Ask yourself, "What entity or aspect does this summary hint at that could answer the original question but was not found yet?"
+   - Formulate a precise, focused factual query targeting that entity or concept to retrieve the missing documents.
+
+6. **Output:**
+   - Produce only the field `query` as a clear, concise question or keyword phrase designed for efficient retrieval of **second-hop documents**.
+   - Ensure the query relates logically to the original question while targeting the broader or complementary knowledge identified in `summary_1`.
+   - Do **not** include the original question or simply rephrase it.
+   - Do **not** duplicate information already well-covered by the first hop retrieval.
+
+By following these principles, you will help the multi-hop retrieval system find all necessary documents to answer the multi-faceted original question completely.
+
+<mark>[HotpotQA Prompt End]</mark>
+</details>
+    <!-- </td> -->
+    </td>
+    <td width="48%" valign="top">
+      <img src="https://raw.githubusercontent.com/gepa-ai/gepa/refs/heads/main/assets/aime_prompt.png" alt="AIME Prompt" width="2500">
+      <details>
+<summary><mark>Click to view full AIME prompt</mark></summary>
 
 <mark>[AIME Prompt Begin]</mark>
 
@@ -164,55 +214,10 @@ Finally:
 - Put the clean final numeric result in the “answer” field only.
 
 <mark>[AIME Prompt End]</mark>
-
-<mark>[HotpotQA Prompt Begin]</mark>
-
-You will be given two input fields: `question` and `summary_1`.
-
-Your task is to generate a new search query (`query`) optimized for the **second hop** of a multi-hop retrieval system. The original user question is typically complex and requires information from multiple documents to answer. The first hop query is the original question used to retrieve an initial set of documents. Your goal is to generate a **second hop query** that retrieves *additional relevant documents* that were *not* found in the first hop but are necessary to answer the original question completely.
-
-Detailed task instructions and hints:
-
-1. **Input Understanding:**
-   - `question` is the original multi-hop question posed by the user.
-   - `summary_1` is a concise summary of information from a document retrieved in the first hop, which partially addresses the question.
-
-2. **Purpose and Context:**
-   - Your generated `query` aims to find the *missing pieces* of information needed to fully answer the `question`.
-   - The multi-hop retrieval system works in stages:
-     - First hop: The original question returns some documents.
-     - Second hop: Your query must help retrieve any *other relevant documents* NOT found in the first hop that hold complementary or broader context necessary for final answer extraction.
-
-3. **Key Observations from Examples and Feedback:**
-   - First-hop documents often cover one entity or aspect in the question.
-   - Remaining relevant documents often involve connected or higher-level concepts mentioned in `summary_1` but not explicitly asked in the original question.
-   - The `query` should be formulated to explicitly target these *missing*, but logically linked, documents.
-   - Avoid merely paraphrasing the original question or restating known facts from `summary_1`.
-   - Instead, infer what broader or related entities/concepts might provide the crucial missing information.
-   - For example, if `summary_1` describes a population for a small civil parish, but the question wants total population of the wider region, your `query` should target that wider region (e.g., "Madeira archipelago population in 2011").
-   - Similarly, if `summary_1` covers a song and the question wants the album it came from, but first hop got song-level documents, your query should retrieve documents about the album itself.
-
-4. **How to Build the Query:**
-   - Identify the entities or topics mentioned in `summary_1` that appear related but different from first-hop documents.
-   - Reframe the query to explicitly mention these broader or related entities connected to the original question.
-   - Include relevant key context from the question to maintain specificity, but shift focus to the missing piece.
-   - The goal is to retrieve documents that link or complement what was retrieved initially.
-
-5. **Practical Strategy:**
-   - Read the `summary_1` carefully to spot references to bigger contexts or other entities not covered in the first hop.
-   - Ask yourself, "What entity or aspect does this summary hint at that could answer the original question but was not found yet?"
-   - Formulate a precise, focused factual query targeting that entity or concept to retrieve the missing documents.
-
-6. **Output:**
-   - Produce only the field `query` as a clear, concise question or keyword phrase designed for efficient retrieval of **second-hop documents**.
-   - Ensure the query relates logically to the original question while targeting the broader or complementary knowledge identified in `summary_1`.
-   - Do **not** include the original question or simply rephrase it.
-   - Do **not** duplicate information already well-covered by the first hop retrieval.
-
-By following these principles, you will help the multi-hop retrieval system find all necessary documents to answer the multi-faceted original question completely.
-
-<mark>[HotpotQA Prompt End]</mark>
 </details>
+    </td>
+  </tr>
+</table>
 
 <br/>
 
