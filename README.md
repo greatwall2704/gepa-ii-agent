@@ -226,30 +226,25 @@ GEPA is built around a flexible [GEPAAdapter](src/gepa/core/adapter.py) abstract
 ### Using GEPA to optimize _your_ system
 
 GEPA can be used to optimize any system consisting of textual components. Follow these steps:
- - **Implement [`GEPAAdapter`](src/gepa/core/adapter.py):** In order to allow the GEPA optimizer to pair with your system and its environment, users can implement the `GEPAAdapter` interface defined in [src/gepa/core/adapter.py](src/gepa/core/adapter.py). `GEPAAdapter` requires 2 methods:
+ - Implement [`GEPAAdapter`](src/gepa/core/adapter.py): In order to allow the GEPA optimizer to pair with your system and its environment, users can implement the `GEPAAdapter` interface defined in [src/gepa/core/adapter.py](src/gepa/core/adapter.py). `GEPAAdapter` requires 2 methods:
     - Evaluate: Given a candidate consisting of proposed text components, and a minibatch of inputs sampled from the train/val sets, evaluate and return execution scores, also capturing the system traces.
     - Extract Traces for Reflection: Given the execution traces obtained from executing a proposed candidate, and a named component being optimized, return the textual content from the traces relevant to the named component.
-- **Prepare trainset and valset:** Lists of example inputs and task metadata.
-- **Call `gepa.optimize`** with your adapter, metric, and system configuration.
+- Prepare trainset and valset: Lists of example inputs and task metadata.
+- Call `gepa.optimize` with your adapter, metric, and system configuration.
 
 > We are actively working on implementing adapters to integrate into many different frameworks. Please open an issue if there's a specific framework you would like to see supported!
 
-### Example: Optmizing terminal-bench's Terminus agent
+#### Example: Optimizing a multi-turn agent in an external environment: terminal-bench's Terminus agent
 
-Terminal-bench is a benchmark for evaluating the performance of terminal-use agents. In [this script](src/gepa/examples/terminal-bench/train_terminus.py), we use GEPA to optimize the system prompt/terminal-use instruction for the default Terminus agent through custom a `GEPAAdapter` implementation. 
+Terminal-bench is a benchmark for evaluating the performance of terminal-use agents. In [this script](src/gepa/examples/terminal-bench/train_terminus.py), we use GEPA to optimize the system prompt/terminal-use instruction for the default Terminus agent through a custom `GEPAAdapter` implementation.
 
-The `TerminusAdapter` runs terminal-bench evaluations with candidate instruction prompts, collects task scores and execution traces, then creates reflective training data by pairing prompts and execution traces with success/failure feedback for LLM-based prompt optimization.
+Note that the terminus agent as well as terminal-bench run in an external environment and is integrated into GEPA via the [`TerminusAdapter`](src/gepa/examples/terminal-bench/train_terminus.py).
 
-
-To run this example, you need to install `terminal-bench` and run the following command:
-
+To run this example:
 ```bash
 pip install terminal-bench
 python src/gepa/examples/terminal-bench/train_terminus.py --model_name=gpt-5-mini
 ```
-
-
-
 
 ## How does GEPA work
 
