@@ -4,6 +4,8 @@
 
 This directory provides the interface to allow GEPA to plug into systems and frameworks of your choice! GEPA can interface with any system consisting of text components, by implementing `GEPAAdapter` in [../core/adapter.py](../core/adapter.py).
 
-Currently, [DSPy](https://dspy.ai/) is the only framework for which an adapter has been implemented and it is available at [https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa).
+Currently, GEPA has the following adapters:
+- [DSPy Adapter](./dspy_adapter/): This adapter integrates GEPA into [DSPy](https://dspy.ai/), to allow it to optimize any DSPy module's signature instructions.
+- [Default Adapter](./default_adapter/): This adapter integrates GEPA into a single-turn LLM environment, where the task is specified as a user message, and an answer string must be present in the assistant response. GEPA optimizes the system prompt.
 
-We aspire to integrate GEPA support in many other frameworks!
+If there are any frameworks you would like GEPA integrated into, please create an issue or PR!
