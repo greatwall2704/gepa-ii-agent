@@ -234,6 +234,23 @@ GEPA can be used to optimize any system consisting of textual components. Follow
 
 > We are actively working on implementing adapters to integrate into many different frameworks. Please open an issue if there's a specific framework you would like to see supported!
 
+### Example: Optmizing terminal-bench's Terminus agent
+
+Terminal-bench is a benchmark for evaluating the performance of terminal-use agents. In [this script](src/gepa/examples/terminal-bench/train_terminus.py), we use GEPA to optimize the system prompt/terminal-use instruction for the default Terminus agent through custom a `GEPAAdapter` implementation. 
+
+The `TerminusAdapter` runs terminal-bench evaluations with candidate instruction prompts, collects task scores and execution traces, then creates reflective training data by pairing prompts and execution traces with success/failure feedback for LLM-based prompt optimization.
+
+
+To run this example, you need to install `terminal-bench` and run the following command:
+
+```bash
+pip install terminal-bench
+python src/gepa/examples/terminal-bench/train_terminus.py --model_name=gpt-5-mini
+```
+
+
+
+
 ## How does GEPA work
 
 GEPA optimizes text components of systems using an evolutionary search algorithm that uses LLM-based reflection for mutating candidates. Most importantly, GEPA leverages task-specific textual feedback (for example, compiler error messages, profiler performance reports, documentation, etc.) to guide the search process. For further details, refer to the paper: [GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning](https://arxiv.org/abs/2507.19457).
