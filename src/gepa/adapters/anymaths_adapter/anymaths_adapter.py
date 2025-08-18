@@ -118,8 +118,8 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
                         "full_assistant_response": output["full_assistant_response"]
                     }
                 )
-
-            return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
+        # Return results for the entire batch (not just the first item)
+        return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 
     def make_reflective_dataset(
         self,
