@@ -10,16 +10,20 @@ class AnyMathsDataInst(TypedDict):
     additional_context: dict[str, str]
     answer: str
 
+
 class AnyMathsTrajectory(TypedDict):
     data: AnyMathsDataInst
     full_assistant_response: str
+
 
 class AnyMathsRolloutOutput(TypedDict):
     full_assistant_response: str
 
 
 class AnyMathsStructuredOutput(BaseModel):
-    final_answer: str = Field(..., description="The final answer to the mathematical problem (i.e., no units, no other text)")
+    final_answer: str = Field(
+        ..., description="The final answer to the mathematical problem (i.e., no units, no other text)"
+    )
     solution_pad: str = Field(..., description="The solution pad containing the step-by-step solution to the problem.")
 
 
@@ -30,14 +34,14 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
 
     Note: Ollama must be installed and configured to use this adapter.
     """
+
     def __init__(
         self,
         model: str,
         failure_score: float = 0.0,
         api_base: str = "http://localhost:11434",
-        max_litellm_workers: int =  10
+        max_litellm_workers: int = 10,
     ) -> None:
-
         import litellm
 
         self.model = model
@@ -49,14 +53,12 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         assert self.api_base is not None, "API base URL must be provided."
         assert self.model.startswith("ollama"), "Model name must start with 'ollama'. Only ollama models are supported"
 
-
     def evaluate(
         self,
         batch: list[AnyMathsDataInst],
         candidate: dict[str, str],
         capture_traces: bool = False,
     ) -> EvaluationBatch[AnyMathsTrajectory, AnyMathsRolloutOutput]:
-
         import ast
 
         outputs: list[AnyMathsRolloutOutput] = []
@@ -66,7 +68,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         if not candidate:
             raise ValueError("Candidate must contain at least one component text.")
 
-        system_content = list(candidate.values())[0]
+        system_content = next(iter(candidate.values()))
 
         litellm_requests = []
 
@@ -86,7 +88,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
                 messages=litellm_requests,
                 api_base=self.api_base,
                 max_workers=self.max_litellm_workers,
-                format=AnyMathsStructuredOutput.model_json_schema()
+                format=AnyMathsStructuredOutput.model_json_schema(),
             )
         except Exception as e:
             raise e
@@ -112,12 +114,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
             scores.append(score)
 
             if capture_traces:
-                trajectories.append(
-                    {
-                        "data": data,
-                        "full_assistant_response": output["full_assistant_response"]
-                    }
-                )
+                trajectories.append({"data": data, "full_assistant_response": output["full_assistant_response"]})
         # Return results for the entire batch (not just the first item)
         return EvaluationBatch(outputs=outputs, scores=scores, trajectories=trajectories)
 
@@ -125,9 +122,8 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         self,
         candidate: dict[str, str],
         eval_batch: EvaluationBatch[AnyMathsTrajectory, AnyMathsRolloutOutput],
-        components_to_update: list[str]
+        components_to_update: list[str],
     ) -> dict[str, list[dict[str, Any]]]:
-
         ret_d: dict[str, list[dict[str, Any]]] = {}
 
         assert len(components_to_update) == 1
@@ -157,11 +153,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
                         "Ensure that the correct answer is included in the response exactly as it is."
                     )
 
-            d = {
-                "Inputs": data["input"],
-                "Generated Outputs": generated_outputs,
-                "Feedback": feedback
-            }
+            d = {"Inputs": data["input"], "Generated Outputs": generated_outputs, "Feedback": feedback}
 
             items.append(d)
 

@@ -21,8 +21,8 @@ If you have a custom dataset, it is best to follow the following schema:
 
 It is best to upload your custom dataset to the Hugging Face dataset hub to fully utilize `datasets.load_dataset`.
 
-### Ollama-only
-This is an Ollama-only adapter, meaning it is specifically designed to work with the Ollama platform via LiteLLM. This design choice is based on the fact that not everyone has access to other provider APIs requiring paid subscriptions. Moreover, we emphasize that **this adapter is specifically fit for local use where one has no access to expensive GPUs.**
+### Adapter Design
+This adapter can work for any LiteLLM supported providers (e.g., OpenAI API, HuggingFace, Groq, vLLM, Ollama, etc.). For this instance, we opt to choose Ollama to show that **this adapter can work for local use where one has no access to expensive GPUs or paid APIs.** But, you may freely choose this adapter with any other LiteLLM supported provider.
 
 ### Preparing the seed prompt
 The seed prompt is the initial instruction you provide to the model. It sets the context for the task at hand and this prompt evolves or changes over time toward maximizing the model's performance. Default failure score (i.e., score if the model outputs incorrectly) is zero.
