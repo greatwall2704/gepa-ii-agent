@@ -1,12 +1,13 @@
-from datetime import datetime
 import json
 import os
-from pathlib import Path
 import subprocess
+from datetime import datetime
+from pathlib import Path
+
 from pydantic import BaseModel
 from terminal_bench.agents.terminus_1 import CommandBatchResponse
 
-from gepa import GEPAAdapter, EvaluationBatch
+from gepa import EvaluationBatch, GEPAAdapter
 
 
 class TerminalBenchTask(BaseModel):
@@ -94,7 +95,7 @@ def get_results(task_id: str, run_id: str) -> tuple[int, list]:
 
     logging_dir = _get_logging_dir(task_id, run_id)
     result_json = logging_dir / "results.json"
-    with open(result_json, "r") as f:
+    with open(result_json) as f:
         result = json.load(f)
     if result.get("parser_results", None):
         score = sum(map(lambda x: x == "passed", result["parser_results"].values()))
@@ -120,7 +121,7 @@ def get_results(task_id: str, run_id: str) -> tuple[int, list]:
         last_episode_dir = episode_dirs[-1]
 
     last_episode_dir_trajectory = last_episode_dir / "debug.json"
-    with open(last_episode_dir_trajectory, "r") as f:
+    with open(last_episode_dir_trajectory) as f:
         trajectory = json.load(f)
 
         if "input" in trajectory and isinstance(trajectory["input"], list):
@@ -207,9 +208,9 @@ class TerminusAdapter(GEPAAdapter):
         components_to_update: list[str],
     ):
         reflective_dataset = {"instruction_prompt": []}
-        for score, trajectory in zip(eval_batch.scores, eval_batch.trajectories):
+        for score, trajectory in zip(eval_batch.scores, eval_batch.trajectories, strict=False):
             if trajectory["success"]:
-                feedback = f"Successfully solved the task!"
+                feedback = "Successfully solved the task!"
             else:
                 feedback = (
                     f"Failed to solve the task. Reason: {trajectory['failed_reason']}"
