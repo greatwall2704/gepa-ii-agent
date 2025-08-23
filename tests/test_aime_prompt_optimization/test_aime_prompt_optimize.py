@@ -1,7 +1,8 @@
-import pytest
 import json
 import os
 from pathlib import Path
+
+import pytest
 
 # --- Constants and Setup ---
 # Use pathlib for robust path handling relative to this test file.
@@ -32,24 +33,24 @@ def mocked_lms(recorder_dir):
         """Creates a deterministic key from a list of message dicts."""
         # json.dumps with sort_keys=True provides a canonical representation.
         # The tuple prefix distinguishes it from reflection_lm calls.
-        return str(('task_lm', json.dumps(messages, sort_keys=True)))
+        return str(("task_lm", json.dumps(messages, sort_keys=True)))
 
     def get_reflection_key(prompt):
         """Creates a deterministic key for the reflection prompt string."""
-        return str(('reflection_lm', prompt))
+        return str(("reflection_lm", prompt))
 
     # --- Record Mode ---
     if should_record:
         # Lazy import litellm only when needed to avoid dependency in replay mode.
         import litellm
-        
+
         print("\n--- Running in RECORD mode. Making live API calls. ---")
 
         def task_lm(messages):
             key = get_task_key(messages)
             if key not in cache:
                 response = litellm.completion(
-                    model="openai/gpt-4.1-nano", 
+                    model="openai/gpt-4.1-nano",
                     messages=messages
                 )
                 cache[key] = response.choices[0].message.content.strip()
@@ -59,7 +60,7 @@ def mocked_lms(recorder_dir):
             key = get_reflection_key(prompt)
             if key not in cache:
                 response = litellm.completion(
-                    model="openai/gpt-4.1", 
+                    model="openai/gpt-4.1",
                     messages=[{"role": "user", "content": prompt}]
                 )
                 cache[key] = response.choices[0].message.content.strip()
@@ -67,7 +68,7 @@ def mocked_lms(recorder_dir):
 
         # Yield the live functions to the test, then save the cache on teardown.
         yield task_lm, reflection_lm
-        
+
         print(f"--- Saving cache to {cache_file} ---")
         with open(cache_file, "w") as f:
             json.dump(cache, f, indent=2)
@@ -76,7 +77,7 @@ def mocked_lms(recorder_dir):
     else:
         print("\n--- Running in REPLAY mode. Using cached API calls. ---")
         try:
-            with open(cache_file, "r") as f:
+            with open(cache_file) as f:
                 cache = json.load(f)
         except FileNotFoundError:
             pytest.fail(
@@ -95,7 +96,7 @@ def mocked_lms(recorder_dir):
             if key not in cache:
                 pytest.fail(f"Unseen input for reflection_lm in replay mode. Key: {key}")
             return cache[key]
-        
+
         yield task_lm, reflection_lm
 
 # --- The Test Function ---
@@ -125,7 +126,7 @@ def test_aime_prompt_optimize(mocked_lms, recorder_dir):
     print("Running GEPA optimization process...")
     gepa_result = gepa.optimize(
         seed_candidate=seed_prompt,
-        trainset=trainset, 
+        trainset=trainset,
         valset=valset,
         adapter=adapter,
         max_metric_calls=30,
@@ -134,7 +135,7 @@ def test_aime_prompt_optimize(mocked_lms, recorder_dir):
 
     # 3. Assertion: Verify the result against the golden file
     optimized_prompt_file = recorder_dir / "optimized_prompt.txt"
-    best_prompt = gepa_result.best_candidate['system_prompt']
+    best_prompt = gepa_result.best_candidate["system_prompt"]
 
     # In record mode, we save the "golden" result
     if os.environ.get("RECORD_TESTS", "false").lower() == "true":
@@ -143,10 +144,10 @@ def test_aime_prompt_optimize(mocked_lms, recorder_dir):
             f.write(best_prompt)
         # Add a basic sanity check to ensure the process produced a valid output
         assert isinstance(best_prompt, str) and len(best_prompt) > 0
-    
+
     # In replay mode, we assert against the golden result
     else:
         print(f"--- Asserting against golden file: {optimized_prompt_file} ---")
-        with open(optimized_prompt_file, "r") as f:
+        with open(optimized_prompt_file) as f:
             expected_prompt = f.read()
         assert best_prompt == expected_prompt

@@ -26,6 +26,10 @@ test = [
     "gepa[full]",
     "pytest"
 ]
+dev = [
+    "gepa[test]",
+    "pre-commit"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/gepa-ai/gepa"

@@ -1,22 +1,18 @@
 import argparse
 import json
-from datetime import datetime
 from pathlib import Path
 
 import litellm
-from terminal_bench.agents.terminus_1 import Terminus
-from terminal_bench.agents.terminus_1 import AgentResult, FailureMode
-from terminal_bench.agents.terminus_1 import Chat
-from terminal_bench.terminal.tmux_session import TmuxSession
+from terminal_bench.agents.terminus_1 import AgentResult, Chat, FailureMode, Terminus
 from terminal_bench.dataset.dataset import Dataset
-
-from gepa.adapters.terminal_bench_adapter.terminal_bench_adapter import (
-    TerminusAdapter,
-    TerminalBenchTask,
-)
+from terminal_bench.terminal.tmux_session import TmuxSession
 
 from gepa import optimize
 from gepa.adapters.terminal_bench_adapter import TerminalBenchTask, TerminusAdapter
+from gepa.adapters.terminal_bench_adapter.terminal_bench_adapter import (
+    TerminalBenchTask,
+    TerminusAdapter,
+)
 
 INSTRUCTION_PROMPT_PATH = (
     Path(__file__).parent / "prompt-templates/instruction_prompt.txt"
