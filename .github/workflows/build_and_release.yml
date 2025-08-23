@@ -3,7 +3,7 @@ name: Publish Python 🐍 distributions 📦 to PyPI
 on:
   push:
     tags:
-      - "*"
+      - "v*"
 jobs:
   check-status:
     runs-on: ubuntu-latest
@@ -58,7 +58,11 @@ jobs:
       - uses: actions/checkout@v4
       - id: extract_tag
         name: Extract tag name
-        run: echo "tag=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_OUTPUT"
+        run: |
+          # Extract tag and remove 'v' prefix to get semver
+          TAG=$(echo $GITHUB_REF | cut -d / -f 3)
+          VERSION=${TAG#v}
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
 
   build-and-publish-test-pypi:
     needs: [check-status, extract-tag]
