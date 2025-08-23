@@ -49,7 +49,7 @@ def mocked_lms(recorder_dir):
             key = get_task_key(messages)
             if key not in cache:
                 response = litellm.completion(
-                    model="openai/gpt-4.1-mini", 
+                    model="openai/gpt-4.1-nano", 
                     messages=messages
                 )
                 cache[key] = response.choices[0].message.content.strip()
@@ -62,7 +62,7 @@ def mocked_lms(recorder_dir):
                     model="openai/gpt-4.1", 
                     messages=[{"role": "user", "content": prompt}]
                 )
-                cache[key] = response.choices.message.content.strip()
+                cache[key] = response.choices[0].message.content.strip()
             return cache[key]
 
         # Yield the live functions to the test, then save the cache on teardown.
@@ -115,7 +115,7 @@ def test_aime_prompt_optimize(mocked_lms, recorder_dir):
     print("Initializing AIME dataset...")
     trainset, valset, _ = gepa.examples.aime.init_dataset()
     trainset = trainset[:10]
-    valset = valset[3:8]
+    valset = valset[:10] #[3:8]
 
     seed_prompt = {
         "system_prompt": "You are a helpful assistant. You are given a question and you need to answer it. The answer should be given at the end of your response in exactly the format '### <final answer>'"
