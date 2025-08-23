@@ -1,12 +1,13 @@
-from datetime import datetime
 import json
 import os
-from pathlib import Path
 import subprocess
+from datetime import datetime
+from pathlib import Path
+
 from pydantic import BaseModel
 from terminal_bench.agents.terminus_1 import CommandBatchResponse
 
-from gepa import GEPAAdapter, EvaluationBatch
+from gepa import EvaluationBatch, GEPAAdapter
 
 
 class TerminalBenchTask(BaseModel):
@@ -23,12 +24,13 @@ def run_agent_tb(
     dataset_version: str = "head",
     agent_import_path: str = "train_terminus:TerminusWrapper",
     n_concurrent: int = 6,
+    prompt_template_path: str = "prompt-templates/instruction_prompt.txt",
 ):
     """Run the replay agent for multiple task IDs using tb run command."""
 
     env = os.environ.copy()
     # write instruction prompt to file
-    with open("prompt-templates/instruction_prompt.txt", "w") as f:
+    with open(prompt_template_path, "w") as f:
         f.write(instruction_prompt)
 
     cmd = [
@@ -46,6 +48,8 @@ def run_agent_tb(
         run_id,
         "--n-concurrent",
         str(n_concurrent),
+        "--output-path",
+        str(Path(os.getcwd()) / "runs"),
     ]
     if isinstance(task_ids, list):
         for task_id in task_ids:
@@ -56,7 +60,7 @@ def run_agent_tb(
     print(f"Running command: {' '.join(cmd)}")
 
     try:
-        result = subprocess.run(cmd, env=env, cwd=Path(__file__).parent, check=True)
+        result = subprocess.run(cmd, env=env, cwd=Path(prompt_template_path).parent.parent, check=True)
         print(f"Command completed successfully with return code: {result.returncode}")
         return result.returncode
     except subprocess.CalledProcessError as e:
@@ -91,7 +95,7 @@ def get_results(task_id: str, run_id: str) -> tuple[int, list]:
 
     logging_dir = _get_logging_dir(task_id, run_id)
     result_json = logging_dir / "results.json"
-    with open(result_json, "r") as f:
+    with open(result_json) as f:
         result = json.load(f)
     if result.get("parser_results", None):
         score = sum(map(lambda x: x == "passed", result["parser_results"].values()))
@@ -117,7 +121,7 @@ def get_results(task_id: str, run_id: str) -> tuple[int, list]:
         last_episode_dir = episode_dirs[-1]
 
     last_episode_dir_trajectory = last_episode_dir / "debug.json"
-    with open(last_episode_dir_trajectory, "r") as f:
+    with open(last_episode_dir_trajectory) as f:
         trajectory = json.load(f)
 
         if "input" in trajectory and isinstance(trajectory["input"], list):
@@ -138,8 +142,13 @@ def get_results(task_id: str, run_id: str) -> tuple[int, list]:
 
 class TerminusAdapter(GEPAAdapter):
 
-    def __init__(self, n_concurrent: int = 6):
+    def __init__(
+        self,
+        n_concurrent: int = 6,
+        instruction_prompt_path: str = "prompt-templates/instruction_prompt.txt",
+    ):
         self.n_concurrent = n_concurrent
+        self.instruction_prompt_path = instruction_prompt_path
 
     def evaluate(
         self,
@@ -159,6 +168,7 @@ class TerminusAdapter(GEPAAdapter):
             example_model_name,
             instruction_prompt=candidate["instruction_prompt"],
             n_concurrent=self.n_concurrent,
+            prompt_template_path=self.instruction_prompt_path,
         )
 
         for example in batch:
@@ -198,9 +208,9 @@ class TerminusAdapter(GEPAAdapter):
         components_to_update: list[str],
     ):
         reflective_dataset = {"instruction_prompt": []}
-        for score, trajectory in zip(eval_batch.scores, eval_batch.trajectories):
+        for score, trajectory in zip(eval_batch.scores, eval_batch.trajectories, strict=False):
             if trajectory["success"]:
-                feedback = f"Successfully solved the task!"
+                feedback = "Successfully solved the task!"
             else:
                 feedback = (
                     f"Failed to solve the task. Reason: {trajectory['failed_reason']}"

@@ -256,12 +256,32 @@ We encourage the community and users to help us develop adapters to allow GEPA t
 
 ## Further Reading
 
-> **GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning**  
-> [arXiv:2507.19457](https://arxiv.org/abs/2507.19457)
+- **Paper:**  📄 [GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning (arXiv:2507.19457)](https://arxiv.org/abs/2507.19457)  
+  The paper describing the GEPA algorithm, technical details and experiments.
 
-> While this repository provides a Python framework, checkout [observablehq](https://observablehq.com/@tomlarkworthy/gepa) for a JavaScript implementation of GEPA!
+- **Tutorials & Examples:**  
+  - [dspy.GEPA Tutorials, with executable notebooks](https://dspy.ai/tutorials/gepa_ai_program/)  
+    Step-by-step notebooks showing how to use GEPA for practical optimization tasks via DSPy, including math, structured data extraction for enterprise tasks and privacy conscious delegation task.
+  - [ObservableHQ: JavaScript Implementation of GEPA](https://observablehq.com/@tomlarkworthy/gepa)  
+    Interactive JS-based version and demo.
 
-To stay up to date or learn more, follow [@LakshyAAAgrawal](https://x.com/LakshyAAAgrawal) and [@lateinteraction](https://twitter.com/lateinteraction) on Twitter.
+- **Code & Artifacts:**  
+  - [GEPA Artifact Repository](https://github.com/gepa-ai/gepa-artifact)  
+    Scripts and configs to fully reproduce the experimental results in the GEPA paper.
+
+- **Social and Discussion:**  
+  - [X (formerly Twitter) Announcement Thread (Lakshya Agrawal)](https://x.com/LakshyAAAgrawal/status/1949867947867984322)  
+    Author’s overview and discussion thread, good for community updates.
+  - Stay up to date:  
+    - [@LakshyAAAgrawal on X (Twitter)](https://x.com/LakshyAAAgrawal)  
+    - [@lateinteraction on X (Twitter)](https://twitter.com/lateinteraction)
+
+- **GEPA Integrations:**  
+  Want to use GEPA in other frameworks?  
+  - [DSPy Adapter Code](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) (integrates GEPA with [DSPy](https://dspy.ai/)),  
+  - [Contributed Adapters](src/gepa/adapters/) – see our adapter templates and issue tracker to request new integrations.
+    - [DefaultAdapter](src/gepa/adapters/default_adapter/) - System Prompt Optimization for a single-turn task.
+    - [TerminalBench Adapter](src/gepa/adapters/terminal_bench_adapter/) - Easily integrating GEPA into a Terminus, a sophisticated external agentic pipeline, and optimizing the agents' system prompt.
 
 ## Reference and Citation
 

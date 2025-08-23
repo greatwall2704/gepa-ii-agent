@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Lakshya A Agrawal and the GEPA contributors
 # https://github.com/gepa-ai/gepa
 
-from typing import Any, TypedDict
+from typing import Any, Callable, TypedDict
 
 from gepa.core.adapter import EvaluationBatch, GEPAAdapter
 
@@ -22,14 +22,16 @@ class DefaultRolloutOutput(TypedDict):
 class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRolloutOutput]):
     def __init__(
         self,
-        model: str,
+        model: str | Callable,
         failure_score: float = 0.0,
         max_litellm_workers: int = 10,
     ):
-        import litellm
+        if isinstance(model, str):
+            import litellm
+            self.litellm = litellm
         self.model = model
+
         self.failure_score = failure_score
-        self.litellm = litellm
         self.max_litellm_workers = max_litellm_workers
 
     def evaluate(
@@ -57,13 +59,14 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             litellm_requests.append(messages)
 
         try:
-            responses = self.litellm.batch_completion(model=self.model, messages=litellm_requests, max_workers=self.max_litellm_workers)
+            if isinstance(self.model, str):
+                responses = [resp.choices[0].message.content.strip() for resp in self.litellm.batch_completion(model=self.model, messages=litellm_requests, max_workers=self.max_litellm_workers)]
+            else:
+                responses = [self.model(messages) for messages in litellm_requests]
         except Exception as e:
             raise e
 
-        for data, response in zip(batch, responses, strict=False):
-            assistant_response = response.choices[0].message.content.strip()
-
+        for data, assistant_response in zip(batch, responses, strict=False):
             output = {"full_assistant_response": assistant_response}
             score = 1.0 if data["answer"] in assistant_response else 0.0
 
