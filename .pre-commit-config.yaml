@@ -5,15 +5,15 @@ default_stages: [pre-commit]
 default_install_hook_types: [pre-commit]
 
 repos:
-  - repo: local
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Pinned to the specific ruff version 0.12.10
+    rev: v0.12.10
     hooks:
+      # Use the 'ruff-check' hook for linting
       - id: ruff-check
-        name: ruff (lint)
-        entry: ruff
-        language: system
-        types_or: [python, pyi]
-        files: ^(src|tests)/.*\.py$
-        args: [check, --fix-only]
+        args: [--fix, --exit-non-zero-on-fix]
+      # You can also add the formatter if desired
+      - id: ruff-format
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
