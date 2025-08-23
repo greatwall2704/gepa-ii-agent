@@ -256,8 +256,11 @@ We encourage the community and users to help us develop adapters to allow GEPA t
 
 ## Further Reading
 
-> **GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning**  
-> [arXiv:2507.19457](https://arxiv.org/abs/2507.19457)
+> Paper: **GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning**: [arXiv:2507.19457](https://arxiv.org/abs/2507.19457)
+
+> [Twitter Thread](https://x.com/LakshyAAAgrawal/status/1949867947867984322)
+
+> [dspy.GEPA tutorials](https://dspy.ai/tutorials/gepa_ai_program/)
 
 > While this repository provides a Python framework, checkout [observablehq](https://observablehq.com/@tomlarkworthy/gepa) for a JavaScript implementation of GEPA!
 
