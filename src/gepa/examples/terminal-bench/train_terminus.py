@@ -3,9 +3,17 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from terminal_bench.agents.terminus_1 import AgentResult, Chat, FailureMode, Terminus
-from terminal_bench.dataset.dataset import Dataset
+import litellm
+from terminal_bench.agents.terminus_1 import Terminus
+from terminal_bench.agents.terminus_1 import AgentResult, FailureMode
+from terminal_bench.agents.terminus_1 import Chat
 from terminal_bench.terminal.tmux_session import TmuxSession
+from terminal_bench.dataset.dataset import Dataset
+
+from gepa.adapters.terminal_bench_adapter.terminal_bench_adapter import (
+    TerminusAdapter,
+    TerminalBenchTask,
+)
 
 from gepa import optimize
 from gepa.adapters.terminal_bench_adapter import TerminalBenchTask, TerminusAdapter
@@ -81,6 +89,7 @@ One thing to be very careful about is handling interactive sessions like less, v
     terminal_bench_dataset.sort_by_duration()
 
     terminal_bench_tasks = terminal_bench_dataset._tasks[::-1]
+
     trainset = [
         TerminalBenchTask(task_id=task.name, model_name=args.model_name)
         for task in terminal_bench_tasks[30:50]
@@ -90,24 +99,90 @@ One thing to be very careful about is handling interactive sessions like less, v
         for task in terminal_bench_tasks[:30]
     ]
 
+    testset = [
+        TerminalBenchTask(task_id=task.name, model_name=args.model_name)
+        for task in terminal_bench_tasks[50:]
+        if task.name != "chem-rf"
+    ]
+
     reflection_lm_name = "openai/gpt-5"
+    reflection_lm = (
+        lambda prompt: litellm.completion(
+            model=reflection_lm_name,
+            messages=[{"role": "user", "content": prompt}],
+            reasoning_effort="high",
+        )
+        .choices[0]
+        .message.content
+    )
+
+    adapter = TerminusAdapter(
+        n_concurrent=args.n_concurrent, instruction_prompt_path=INSTRUCTION_PROMPT_PATH
+    )
+    testset_results_no_prompt = adapter.evaluate(
+        testset, {"instruction_prompt": ""}, capture_traces=True
+    )
+    testset_results_before_opt = adapter.evaluate(
+        testset,
+        {"instruction_prompt": initial_prompt_from_terminus},
+        capture_traces=True,
+    )
+
+    with open("gepa_terminus/testset_results_no_prompt.json", "w") as f:
+        json.dump(
+            {
+                "score": sum(
+                    trajectory["success"]
+                    for trajectory in testset_results_no_prompt.trajectories
+                ),
+                "trajectories": testset_results_no_prompt.trajectories,
+            },
+            f,
+            indent=4,
+        )
+    with open("gepa_terminus/testset_results_before_opt.json", "w") as f:
+        json.dump(
+            {
+                "score": sum(
+                    trajectory["success"]
+                    for trajectory in testset_results_before_opt.trajectories
+                ),
+                "trajectories": testset_results_before_opt.trajectories,
+            },
+            f,
+            indent=4,
+        )
 
     optimized_results = optimize(
         seed_candidate={"instruction_prompt": initial_prompt_from_terminus},
         trainset=trainset,
         valset=valset,
-        adapter=TerminusAdapter(n_concurrent=args.n_concurrent),
-        reflection_lm=reflection_lm_name,
+        adapter=adapter,
+        reflection_lm=reflection_lm,
         use_wandb=True,
         max_metric_calls=400,
         reflection_minibatch_size=3,
         perfect_score=1,
         skip_perfect_score=False,
+        run_dir="gepa_terminus",
     )
 
-    print(optimized_results.to_dict())
-    # save to json
-    with open(
-        f"optimized_results_{datetime.now().strftime('%Y%m%d%H%M%S')}.json", "w"
-    ) as f:
-        json.dump(optimized_results.to_dict(), f, indent=4)
+    testset_results_after_opt = adapter.evaluate(
+        testset,
+        {"instruction_prompt": optimized_results.best_candidate["instruction_prompt"]},
+        capture_traces=True,
+    )
+
+    with open("gepa_terminus/optimized_results.json", "w") as f:
+        json.dump(
+            {
+                "score": sum(
+                    trajectory["success"]
+                    for trajectory in testset_results_after_opt.trajectories
+                ),
+                "trajectories": testset_results_after_opt.trajectories,
+            },
+            f,
+            indent=4,
+        )
+
