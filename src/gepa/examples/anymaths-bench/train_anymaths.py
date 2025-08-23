@@ -76,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--api_base", type=str, default="http://localhost:11434")
     parser.add_argument("--max_litellm_workers", type=int, default=10)
     parser.add_argument("--anymaths_dset_name", type=str, default="openai/gsm8k")
-    parser.add_argument("--budget", type=int, default=50, help="The budget for the optimization process.")
+    parser.add_argument("--budget", type=int, default=5, help="The budget for the optimization process.")
     parser.add_argument("--reflection_lm", type=str, default="ollama/qwen3:8b", help="The name of the reflection LM to use.")
     parser.add_argument("--reflection_minibatch_size", type=int, default=3, help="The size of the minibatch for the reflection LM.")
     parser.add_argument("--seed", type=int, default=0, help="The seed for the random number generator for reproducibility.")
@@ -90,9 +90,9 @@ if __name__ == "__main__":
 
     trainset, valset, testset = init_dataset(args.anymaths_dset_name)
     
-    trainset = trainset[:10]  # Limit to 10 samples for demo purposes
-    valset = valset[:10]      # Limit to 10 samples for demo purposes
-    testset = testset[:10]    # Limit to 10 samples for demo purposes
+    trainset = trainset[:50]  # Limit to 50 samples for demo purposes
+    valset = valset[:50]      # Limit to 50 samples for demo purposes
+    testset = testset[:50]    # Limit to 50 samples for demo purposes
     
     print(f"Train set size: {len(trainset)}")
     print(f"Validation set size: {len(valset)}")
