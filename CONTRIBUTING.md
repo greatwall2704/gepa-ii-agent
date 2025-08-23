@@ -23,7 +23,7 @@ way to set up the development environment. First, install uv by following the
 After uv is installed, in your working directory (`gepa/`), run:
 
 ```shell
-uv sync --extra dev
+uv sync --extra dev --python 3.11
 ```
 
 Then you are all set!
