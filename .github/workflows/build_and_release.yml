@@ -5,8 +5,53 @@ on:
     tags:
       - "*"
 jobs:
+  check-status:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'gepa-ai'
+    outputs:
+      status_checks_passed: ${{ steps.check_status.outputs.passed }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if all status checks are passing
+        id: check_status
+        run: |
+          # Get the latest commit SHA on main branch
+          git fetch origin main
+          LATEST_COMMIT=$(git rev-parse origin/main)
+          
+          echo "Checking status checks for commit: $LATEST_COMMIT"
+          
+          # Wait for status checks to complete (with timeout)
+          echo "Waiting for status checks to complete..."
+          for i in {1..30}; do
+            # Check if all required status checks are passing
+            STATUS=$(gh api repos/${{ github.repository }}/commits/$LATEST_COMMIT/status --jq '.state')
+            
+            if [ "$STATUS" = "success" ]; then
+              echo "All status checks are passing"
+              echo "passed=true" >> "$GITHUB_OUTPUT"
+              break
+            elif [ "$STATUS" = "failure" ] || [ "$STATUS" = "error" ]; then
+              echo "Status checks failed"
+              echo "passed=false" >> "$GITHUB_OUTPUT"
+              exit 1
+            else
+              echo "Status checks still pending... (attempt $i/30)"
+              sleep 10
+            fi
+          done
+          
+          # If we reach here without setting passed=true, status checks didn't complete in time
+          if [ "$(echo ${{ steps.check_status.outputs.passed }})" != "true" ]; then
+            echo "Status checks did not complete within timeout"
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
   extract-tag:
     runs-on: ubuntu-latest
+    needs: check-status
+    if: github.repository_owner == 'gepa-ai' && needs.check-status.outputs.status_checks_passed == 'true'
     outputs:
       version: ${{ steps.extract_tag.outputs.tag }}
     steps:
@@ -16,7 +61,8 @@ jobs:
         run: echo "tag=$(echo $GITHUB_REF | cut -d / -f 3)" >> "$GITHUB_OUTPUT"
 
   build-and-publish-test-pypi:
-    needs: extract-tag
+    needs: [check-status, extract-tag]
+    if: github.repository_owner == 'gepa-ai' && needs.check-status.outputs.status_checks_passed == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -26,11 +72,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.11
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install dependencies
-        run: python3 -m pip install --upgrade setuptools wheel twine build semver packaging requests
+      - name: Set up latest uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+      - name: Install build dependencies
+        run: uv pip install ".[build]"
       - name: Get correct version for TestPyPI release
         id: check_version
         run: |
@@ -42,18 +92,17 @@ jobs:
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
         run: sed -i '/#replace_package_version_marker/{n;s/version="[^"]*"/version="${{ steps.check_version.outputs.version }}"/;}' pyproject.toml
-      - name: Update package name in pyproject.toml
-        run: sed -i '/#replace_package_name_marker/{n;s/name="[^"]*"/name="gepa"/;}' pyproject.toml
       - name: Build a binary wheel
-        run: python3 -m build
+        run: uv run python -m build
       # Test the locally built wheel
       - name: Create test environment
-        run: python -m venv test_before_testpypi
+        run: uv venv test_before_testpypi
       - name: Test package installation and functionality
         run: |
           source test_before_testpypi/bin/activate
           # Install the locally built wheel and testing dependencies
-          pip install dist/*.whl pytest
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          uv pip install "$WHEEL_FILE[dev]" pytest
           pytest tests/
           deactivate
       # Publish to test-PyPI
@@ -65,9 +114,9 @@ jobs:
   # TODO: Add tests using gepa
 
   build-and-publish-pypi:
-    needs: [extract-tag, build-and-publish-test-pypi]
-    # Only publish to PyPI if the repository owner is stanfordnlp
-    if: github.repository_owner == 'gepa-ai'
+    needs: [check-status, extract-tag, build-and-publish-test-pypi]
+    # Only publish to PyPI if the repository owner is gepa-ai and status checks pass
+    if: github.repository_owner == 'gepa-ai' && needs.check-status.outputs.status_checks_passed == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -77,26 +126,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.11
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install dependencies
-        run: python3 -m pip install --upgrade setuptools wheel twine build
+      - name: Set up latest uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+      - name: Install build dependencies
+        run: uv pip install ".[build]"
       - name: Update version in pyproject.toml
-        run: sed -i '/#replace_package_version_marker/{n;s/version *= *"[^"]*"/version="${{ needs.extract-tag.outputs.version }}"/;}' pyproject.toml
-      # Publish to gepa
-      - name: Update package name in pyproject.toml
-        run: sed -i '/#replace_package_name_marker/{n;s/name *= *"[^"]*"/name="gepa"/;}' pyproject.toml
+        run: sed -i '/#replace_package_version_marker/{n;s/version="[^"]*"/version="${{ steps.check_version.outputs.version }}"/;}' pyproject.toml
       - name: Build a binary wheel
-        run: python3 -m build
+        run: uv run python -m build
       # Test the locally built wheel before publishing to pypi
       - name: Create test environment
-        run: python -m venv test_before_pypi
+        run: uv venv test_before_pypi
       - name: Test package installation and functionality
         run: |
           source test_before_pypi/bin/activate
           # Install the locally built wheel and testing dependencies
-          pip install dist/*.whl pytest
+          WHEEL_FILE=$(ls dist/*.whl | head -1)
+          uv pip install "$WHEEL_FILE[dev]" pytest
           pytest tests/
           deactivate
           rm -r test_before_pypi
@@ -104,6 +155,11 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           attestations: false
+      - uses: stefanzweifel/git-auto-commit-action@v5 # auto commit changes to main
+        with:
+          commit_message: Update versions
+          create_branch: true
+          branch: release-${{ needs.extract-tag.outputs.version }}
       - name: Checkout main branch
         run: |
           git fetch origin
