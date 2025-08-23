@@ -7,13 +7,12 @@ import logging
 import random
 from typing import Any, Callable, Protocol
 
-from gepa.core.adapter import EvaluationBatch, GEPAAdapter
-
 from dspy.adapters.chat_adapter import ChatAdapter
 from dspy.adapters.types import History
 from dspy.evaluate import Evaluate
 from dspy.primitives import Example, Prediction
 from dspy.teleprompt.bootstrap_trace import TraceData
+from gepa.core.adapter import EvaluationBatch, GEPAAdapter
 
 
 class LoggerAdapter:

@@ -31,7 +31,7 @@ class DefaultAdapter(GEPAAdapter[DefaultDataInst, DefaultTrajectory, DefaultRoll
             self.litellm = litellm
         self.model = model
 
-        self.failure_score = failure_score        
+        self.failure_score = failure_score
         self.max_litellm_workers = max_litellm_workers
 
     def evaluate(

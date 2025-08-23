@@ -37,7 +37,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         api_base: str = "http://localhost:11434",
         max_litellm_workers: int =  10
     ) -> None:
-        
+
         import litellm
 
         self.model = model
@@ -95,7 +95,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
             correct_output_format = True
             try:
                 assistant_response = ast.literal_eval(response.choices[0].message.content.strip())
-            except Exception as e:
+            except Exception:
                 assistant_response = "Assistant failed to respond with the correct answer or format."
                 correct_output_format = False
 
@@ -103,11 +103,11 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
                 structured_assistant_response = f"Assistant's Solution: {assistant_response['solution_pad']}\n"
                 structured_assistant_response += f"Final Answer: {assistant_response['final_answer']}"
                 output = {"full_assistant_response": structured_assistant_response}
-                score = 1.0 if data["answer"] in assistant_response['final_answer'] else self.failure_score
+                score = 1.0 if data["answer"] in assistant_response["final_answer"] else self.failure_score
             else:
                 output = {"full_assistant_response": assistant_response}
                 score = self.failure_score
-            
+
             outputs.append(output)
             scores.append(score)
 
@@ -127,7 +127,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         eval_batch: EvaluationBatch[AnyMathsTrajectory, AnyMathsRolloutOutput],
         components_to_update: list[str]
     ) -> dict[str, list[dict[str, Any]]]:
-        
+
         ret_d: dict[str, list[dict[str, Any]]] = {}
 
         assert len(components_to_update) == 1
@@ -162,7 +162,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
                 "Generated Outputs": generated_outputs,
                 "Feedback": feedback
             }
-            
+
             items.append(d)
 
         ret_d[comp] = items
