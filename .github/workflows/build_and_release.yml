@@ -14,6 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check if all status checks are passing
         id: check_status
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get the latest commit SHA on main branch
           git fetch origin main
