@@ -153,4 +153,4 @@ jobs:
       # Ensure gepa[dspy] does not bring in new packages
       - name: Install dependencies
         run: |
-          uv run -p .venv --extra dspy python -c "try: import datasets; except ImportError: print('Pass: The `datasets` package was not installed, as expected.'); exit(0); else: print('Fail: The `datasets` package was unexpectedly installed.'); exit(1)"
+          uv run --isolated --extra dspy python -c "try: import datasets; except ImportError: print('Pass: The `datasets` package was not installed, as expected.'); exit(0); else: print('Fail: The `datasets` package was unexpectedly installed.'); exit(1)"
