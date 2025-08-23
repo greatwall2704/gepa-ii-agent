@@ -34,7 +34,7 @@ jobs:
         run: uv sync -p .venv --extra dev
       - name: Ruff Check
         run: |
-          ruff check --fix-only --diff --exit-non-zero-on-fix || (
+          uv run -p .venv ruff check --fix-only --diff --exit-non-zero-on-fix || (
             echo ""
             echo "❌ Ruff found issues that can be fixed automatically."
             echo "💡 To fix them locally, run:"

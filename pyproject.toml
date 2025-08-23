@@ -29,7 +29,8 @@ test = [
 dev = [
     "gepa[test]",
     "pre-commit",
-    "build>=1.0.3"
+    "build>=1.0.3",
+    "ruff>=0.3.0"
 ]
 
 [project.urls]
