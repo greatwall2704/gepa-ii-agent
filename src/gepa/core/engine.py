@@ -17,6 +17,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
     """
     Orchestrates the optimization loop. It uses pluggable ProposeNewCandidate strategies.
     """
+
     def __init__(
         self,
         run_dir: str | None,
@@ -37,10 +38,12 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         wandb_api_key: str | None = None,
         wandb_init_kwargs: dict[str, Any] | None = None,
         track_best_outputs: bool = False,
+        raise_on_exception: bool = True,
     ):
         # Budget constraint: exactly one of max_metric_calls or num_iters must be set
-        assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
+        assert (max_metric_calls is not None) + (num_iters is not None) == 1, (
             f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
+        )
 
         self.logger = logger
         self.run_dir = run_dir
@@ -50,7 +53,9 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
         self.num_iters = num_iters
         self.max_metric_calls = max_metric_calls
-        assert (self.num_iters is not None) + (self.max_metric_calls is not None) == 1, f"Exactly one of num_iters or max_metric_calls should be set. You set num_iters={self.num_iters}, max_metric_calls={self.max_metric_calls}"
+        assert (self.num_iters is not None) + (self.max_metric_calls is not None) == 1, (
+            f"Exactly one of num_iters or max_metric_calls should be set. You set num_iters={self.num_iters}, max_metric_calls={self.max_metric_calls}"
+        )
 
         self.perfect_score = perfect_score
         self.use_wandb = use_wandb
@@ -66,6 +71,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             self.merge_proposer.last_iter_found_new_program = False
 
         self.track_best_outputs = track_best_outputs
+        self.raise_on_exception = raise_on_exception
 
     def _val_evaluator(self) -> Callable[[dict[str, str]], tuple[list[RolloutOutput], list[float]]]:
         assert self.valset is not None
@@ -95,12 +101,12 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             valset_outputs=valset_outputs,
             valset_subscores=valset_subscores,
             run_dir=self.run_dir,
-            num_metric_calls_by_discovery_of_new_program=num_metric_calls_by_discovery
+            num_metric_calls_by_discovery_of_new_program=num_metric_calls_by_discovery,
         )
         state.full_program_trace[-1]["new_program_idx"] = new_program_idx
 
         if new_program_idx == linear_pareto_front_program_idx:
-            self.logger.log(f"Iteration {state.i+1}: New program is on the linear pareto front")
+            self.logger.log(f"Iteration {state.i + 1}: New program is on the linear pareto front")
 
         log_detailed_metrics_after_discovering_new_program(
             logger=self.logger,
@@ -135,20 +141,24 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
         if self.use_wandb:
             import wandb  # type: ignore
-            wandb.log({
-                "base_program_full_valset_score": state.program_full_scores_val_set[0],
-                "iteration": state.i+1,
-            })
-        self.logger.log(f"Iteration {state.i+1}: Base program full valset score: {state.program_full_scores_val_set[0]}")
+
+            wandb.log(
+                {
+                    "base_program_full_valset_score": state.program_full_scores_val_set[0],
+                    "iteration": state.i + 1,
+                }
+            )
+        self.logger.log(
+            f"Iteration {state.i + 1}: Base program full valset score: {state.program_full_scores_val_set[0]}"
+        )
 
         # Merge scheduling
         if self.merge_proposer is not None:
             self.merge_proposer.last_iter_found_new_program = False
 
         # Main loop
-        while (
-            (self.num_iters is None or state.num_full_ds_evals < self.num_iters) and
-            (self.max_metric_calls is None or state.total_num_evals < self.max_metric_calls)
+        while (self.num_iters is None or state.num_full_ds_evals < self.num_iters) and (
+            self.max_metric_calls is None or state.total_num_evals < self.max_metric_calls
         ):
             assert state.is_consistent()
             try:
@@ -181,7 +191,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
                             else:
                                 # REJECTED: do NOT consume merges_due or total_merges_tested
                                 self.logger.log(
-                                    f"Iteration {state.i+1}: New program subsample score {new_sum} is worse than both parents {parent_sums}, skipping merge"
+                                    f"Iteration {state.i + 1}: New program subsample score {new_sum} is worse than both parents {parent_sums}, skipping merge"
                                 )
                                 # Skip reflective this iteration (old behavior)
                                 continue
@@ -191,21 +201,19 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
                 # 2) Reflective mutation proposer
                 proposal = self.reflective_proposer.propose(state)
                 if proposal is None:
-                    self.logger.log(f"Iteration {state.i+1}: Reflective mutation did not propose a new candidate")
+                    self.logger.log(f"Iteration {state.i + 1}: Reflective mutation did not propose a new candidate")
                     continue
 
                 # Acceptance: require strict improvement on subsample
                 old_sum = sum(proposal.subsample_scores_before or [])
                 new_sum = sum(proposal.subsample_scores_after or [])
                 if new_sum <= old_sum:
-                    self.logger.log(f"Iteration {state.i+1}: New subsample score is not better, skipping")
+                    self.logger.log(f"Iteration {state.i + 1}: New subsample score is not better, skipping")
                     continue
 
                 # Accept: full eval + add
                 self._run_full_eval_and_add(
-                    new_program=proposal.candidate,
-                    state=state,
-                    parent_program_idx=proposal.parent_program_ids
+                    new_program=proposal.candidate, state=state, parent_program_idx=proposal.parent_program_ids
                 )
 
                 # Schedule merge attempts like original behavior
@@ -215,9 +223,12 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
                         self.merge_proposer.merges_due += 1
 
             except Exception as e:
-                self.logger.log(f"Iteration {state.i+1}: Exception during optimization: {e}")
+                self.logger.log(f"Iteration {state.i + 1}: Exception during optimization: {e}")
                 self.logger.log(traceback.format_exc())
-                continue
+                if self.raise_on_exception:
+                    raise e
+                else:
+                    continue
 
         state.save(self.run_dir)
         return state

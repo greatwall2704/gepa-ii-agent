@@ -88,6 +88,7 @@ ignore = [
     "E721", # Allow using == to compare with type
     "UP031", # Allow percent format
     "RUF022", # Allow unsorted __all__ value
+    "E731"
 ]
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
