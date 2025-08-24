@@ -39,7 +39,7 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         self,
         model: str,
         failure_score: float = 0.0,
-        api_base: str = "http://localhost:11434",
+        api_base: str | None = "http://localhost:11434",
         max_litellm_workers: int = 10,
     ) -> None:
         import litellm
@@ -50,8 +50,8 @@ class AnyMathsAdapter(GEPAAdapter[AnyMathsDataInst, AnyMathsTrajectory, AnyMaths
         self.max_litellm_workers = max_litellm_workers
         self.api_base = api_base
 
-        assert self.api_base is not None, "API base URL must be provided."
-        assert self.model.startswith("ollama"), "Model name must start with 'ollama'. Only ollama models are supported"
+        if self.model.startswith("ollama"):
+            assert self.api_base is not None, "API base URL must be provided when using Ollama."
 
     def evaluate(
         self,

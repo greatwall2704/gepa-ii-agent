@@ -1,7 +1,7 @@
 # GEPA for Math Problem Solving
 **`AnyMaths`** Adapter is a GEPAAdapter for any dataset that contains mathematical word problems of varying complexity and structure. It is designed to handle a wide range of mathematical tasks, including arithmetic, algebra, and more.
 
-Note: `Ollama` must be installed and configured to use this adapter. Instructions to download Ollama can be found in [this link](https://ollama.com/download). I recommend the Linux installation.
+Note: Just for this example, we will be using Ollama. Hence, one must ensure to have Ollama downloaded before proceeding through [this link](https://ollama.com/download). However, this is not necessary and that you may also use other provider APIs or LiteLLM-supported providers. This adapter can be used as a standalone without Ollama.
 
 ### Preparing the maths & reasoning dataset
 In `src/gepa/examples/anymaths-bench/train_anymaths.py`, a sample function to prepare any maths dataset is provided via `init_dataset`. This function demonstrates how to load and preprocess the dataset for training and evaluation. Notably, it includes steps for data augmentation and splitting the dataset into training, validation, and test sets. Right now, it is more convenient to find datasets from Hugging Face dataset hub.
@@ -22,7 +22,7 @@ If you have a custom dataset, it is best to follow the following schema:
 It is best to upload your custom dataset to the Hugging Face dataset hub to fully utilize `datasets.load_dataset`.
 
 ### Adapter Design
-This adapter can work for any LiteLLM supported providers (e.g., OpenAI API, HuggingFace, Groq, vLLM, Ollama, etc.). For this instance, we opt to choose Ollama to show that **this adapter can work for local use where one has no access to expensive GPUs or paid APIs.** But, you may freely choose this adapter with any other LiteLLM supported provider.
+This adapter can work for any LiteLLM supported providers (e.g., OpenAI API, HuggingFace, Groq, vLLM, Ollama, etc.). For this instance, we opt to choose Ollama to show that **this adapter can work for local use where one has no access to expensive GPUs or paid APIs.** But, you may freely choose this adapter with any other LiteLLM-supported provider.
 
 ### Preparing the seed prompt
 The seed prompt is the initial instruction you provide to the model. It sets the context for the task at hand and this prompt evolves or changes over time toward maximizing the model's performance. Default failure score (i.e., score if the model outputs incorrectly) is zero.
@@ -32,7 +32,7 @@ Set the seed prompt in a separate directory under `prompt-templates`. Inside thi
 ### Specifying the reflection LM
 The reflection LM is a language model used to generate reflections on the task at hand. You can specify the reflection LM by setting the `reflection_lm` argument when calling the `optimize` function.
 
-### Running a sample `AnyMaths` training
+### Running an `AnyMaths` training
 To run a sample training session using the `AnyMaths` adapter, you can use the following command:
 
 ```bash
@@ -44,14 +44,21 @@ python src/gepa/examples/anymaths-bench/train_anymaths.py --model_name ... --api
 - `--anymaths_dset_name`: The name of the AnyMaths dataset to use for training.
 - `--reflection_lm`: The name of the reflection language model to use (e.g., `"ollama/qwen3:8b"`).
 - `--reflection_minibatch_size`: The size of the minibatch for the reflection LM (default is 3).
-- `--budget`: The budget for the optimization process (default is 50).
+- `--budget`: The budget for the optimization process (default is 500).
 - `--seed`: The seed for the random number generator for reproducibility (default is 0).
 
 
 Example of a run:
 ```bash
-python src/gepa/examples/anymaths-bench/train_anymaths.py --model_name "ollama/qwen3:4b" --api_base "http://localhost:11434" --max_litellm_workers 4 --anymaths_dset_name "openai/gsm8k" --reflection_lm "ollama/qwen3:8b" --reflection_minibatch_size 3 --budget 5 --seed 0
+python src/gepa/examples/anymaths-bench/train_anymaths.py --model_name "ollama/qwen3:4b" --api_base "http://localhost:11434" --max_litellm_workers 4 --anymaths_dset_name "openai/gsm8k" --reflection_lm "ollama/qwen3:8b" --reflection_minibatch_size 3 --budget 500 --seed 0
 ```
+
+Once the training is completed, you may replace the optimal prompt found in `src/gepa/examples/anymaths-bench/prompt-templates/optimal_prompt.txt`.
+
+#### Running the `eval_default.py`
+`eval_default.py` is used to perform test split evaluation. Feel free to modify this script to fit your custom evaluation scheme. For this example, we evaluated it on the `openai/gsm8k` - `test` split.
+
+Note: The model that was used in training must also be the same model used to perform evaluation.
 
 #### Sample output
 - Initial prompt
@@ -64,7 +71,7 @@ The following fields are what you need to include in your response:
 - final_answer: The final answer to the question.
 - solution_pad: The step-by-step solution to the problem.
 ```
-- Final prompt (after 4 iterations):
+- Final prompt (after exhausting `budget=500`):
 ```
 You are an AI assistant that solves mathematical word problems. You will be given a question and you need to provide a step-by-step solution to the problem. Finally, you will provide the answer to the question.
 
@@ -89,11 +96,13 @@ Example: If the problem involves multiple steps (e.g., percentages, averages, co
 
 
 ### Experiments
-| Dataset - Split | Model | Accuracy (Before GEPA) $\uparrow$ | Accuracy (After GEPA) $\uparrow$ | GEPA Budget |
-| ------- | ------- | ---------------------- | --------------------- | ------------ |
-| `openai/gsm8k` - `test` | `ollama/qwen3:4b` | 18% (238/1319) | 23% (300/1319) | 5 |
+| Dataset - Split | Model | Accuracy (Before GEPA) $\uparrow$ | Accuracy (After GEPA) $\uparrow$ | GEPA Budget | Train-Val-Test Split Samples Used in GEPA Optimization |
+| ------- | ------- | ---------------------- | --------------------- | ------------ | ------ |
+| `openai/gsm8k` - `test` | `ollama/qwen3:4b` | 18% (238/1319) | 23% (300/1319) | 500 | 50-50-50 |
 
-With just a `budget=5`, GEPA was able to improve the model's accuracy by 5% on the `openai/gsm8k` test split using the Qwen3-4b model. More tests will be done soon on other models (preferrably, small language models first).
+With just a `budget=500`, GEPA was able to improve the model's accuracy by 5% on the `openai/gsm8k` test split using the `Qwen3-4b` model.
+
+**Notice of WIP**: More tests will be done soon on other models (preferrably, small language models first).
 
 #### Initial prompt for `openai/gsm8k` - `test`:
 ```
@@ -106,7 +115,7 @@ The following fields are what you need to include in your response:
 - solution_pad: The step-by-step solution to the problem.
 ```
 
-#### Optimized prompt for `openai/gsm8k` - `test`:
+#### Optimized prompt for `openai/gsm8k` - `test` after exhausted `budget=500`:
 ```
 ### Task Instruction: Solve Multi-Step Mathematical Problems with Precision and Contextual Understanding
 

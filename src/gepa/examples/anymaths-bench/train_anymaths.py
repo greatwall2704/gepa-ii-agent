@@ -64,7 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--api_base", type=str, default="http://localhost:11434")
     parser.add_argument("--max_litellm_workers", type=int, default=10)
     parser.add_argument("--anymaths_dset_name", type=str, default="openai/gsm8k")
-    parser.add_argument("--budget", type=int, default=5, help="The budget for the optimization process.")
+    parser.add_argument("--budget", type=int, default=500, help="The budget for the optimization process.")
     parser.add_argument(
         "--reflection_lm", type=str, default="ollama/qwen3:8b", help="The name of the reflection LM to use."
     )
@@ -117,8 +117,9 @@ if __name__ == "__main__":
         perfect_score=1,
         skip_perfect_score=False,
         use_wandb=False,
-        num_iters=budget,
+        max_metric_calls=budget,
         seed=seed,
+        display_progress_bar=True,
     )
 
     print(optimized_results.to_dict())
