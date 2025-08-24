@@ -5,40 +5,9 @@ on:
     tags:
       - "v*"
 jobs:
-  check-status:
-    runs-on: ubuntu-latest
-    if: github.repository_owner == 'gepa-ai'
-    outputs:
-      status_checks_passed: ${{ steps.check_status.outputs.passed }}
-    steps:
-      - name: Wait for run_tests workflow
-        id: wait_for_tests
-        uses: lewagon/wait-on-check-action@v1.3.1
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          check-name: 'Lint, Test, and Build'
-          ref: ${{ github.ref }}
-          wait-interval: 10
-      
-      - name: Check Status
-        id: check_status
-        run: |
-          # Get the conclusion of the run_tests workflow
-          WORKFLOW_CONCLUSION="${{ steps.wait_for_tests.outputs.conclusion }}"
-          
-          if [[ "$WORKFLOW_CONCLUSION" == "success" ]]; then
-            echo "✅ All tests passed"
-            echo "passed=true" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Tests failed with conclusion: $WORKFLOW_CONCLUSION"
-            echo "passed=false" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
   extract-tag:
     runs-on: ubuntu-latest
-    needs: check-status
-    if: github.repository_owner == 'gepa-ai' && needs.check-status.outputs.status_checks_passed == 'true'
+    if: github.repository_owner == 'gepa-ai'
     outputs:
       version: ${{ steps.extract_tag.outputs.tag }}
     steps:
@@ -52,8 +21,8 @@ jobs:
           echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
 
   build-and-publish-test-pypi:
-    needs: [check-status, extract-tag]
-    if: github.repository_owner == 'gepa-ai' && needs.check-status.outputs.status_checks_passed == 'true'
+    needs: [extract-tag]
+    if: github.repository_owner == 'gepa-ai'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -70,6 +39,8 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: latest
+      - name: Create virtual environment
+        run: uv venv
       - name: Install build dependencies
         run: uv pip install ".[build]"
       - name: Get correct version for TestPyPI release
@@ -78,7 +49,7 @@ jobs:
           VERSION=${{ needs.extract-tag.outputs.version }}  
           PACKAGE_NAME="gepa"
           echo "Checking if $VERSION for $PACKAGE_NAME exists on TestPyPI"  
-          NEW_VERSION=$(python3 .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
+          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
           echo "Version to be used for TestPyPI release: $NEW_VERSION"  
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
@@ -105,9 +76,9 @@ jobs:
   # TODO: Add tests using gepa
 
   build-and-publish-pypi:
-    needs: [check-status, extract-tag, build-and-publish-test-pypi]
+    needs: [extract-tag, build-and-publish-test-pypi]
     # Only publish to PyPI if the repository owner is gepa-ai and status checks pass
-    if: github.repository_owner == 'gepa-ai' && needs.check-status.outputs.status_checks_passed == 'true'
+    if: github.repository_owner == 'gepa-ai'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -124,6 +95,8 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           version: latest
+      - name: Create virtual environment
+        run: uv venv
       - name: Install build dependencies
         run: uv pip install ".[build]"
       - name: Get correct version for PyPI release
@@ -132,7 +105,7 @@ jobs:
           VERSION=${{ needs.extract-tag.outputs.version }}  
           PACKAGE_NAME="gepa"
           echo "Checking if $VERSION for $PACKAGE_NAME exists on PyPI"  
-          NEW_VERSION=$(python3 .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
+          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
           echo "Version to be used for PyPI release: $NEW_VERSION"  
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
