@@ -15,7 +15,7 @@ jobs:
         id: wait_for_tests
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
           check-name: 'Lint, Test, and Build'
           ref: ${{ github.ref }}
           wait-interval: 10
