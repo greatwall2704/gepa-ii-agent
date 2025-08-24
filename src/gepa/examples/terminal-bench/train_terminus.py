@@ -8,15 +8,12 @@ from terminal_bench.dataset.dataset import Dataset
 from terminal_bench.terminal.tmux_session import TmuxSession
 
 from gepa import optimize
-from gepa.adapters.terminal_bench_adapter import TerminalBenchTask, TerminusAdapter
 from gepa.adapters.terminal_bench_adapter.terminal_bench_adapter import (
     TerminalBenchTask,
     TerminusAdapter,
 )
 
-INSTRUCTION_PROMPT_PATH = (
-    Path(__file__).parent / "prompt-templates/instruction_prompt.txt"
-)
+INSTRUCTION_PROMPT_PATH = Path(__file__).parent / "prompt-templates/instruction_prompt.txt"
 
 
 class TerminusWrapper(Terminus):
@@ -27,9 +24,7 @@ class TerminusWrapper(Terminus):
         api_base: str | None = None,
         **kwargs,
     ):
-        self.PROMPT_TEMPLATE_PATH = (
-            Path(__file__).parent / "prompt-templates/terminus.txt"
-        )
+        self.PROMPT_TEMPLATE_PATH = Path(__file__).parent / "prompt-templates/terminus.txt"
         self.instruction_prompt = INSTRUCTION_PROMPT_PATH.read_text()
         super().__init__(model_name, max_episodes, api_base, **kwargs)
 
@@ -87,13 +82,9 @@ One thing to be very careful about is handling interactive sessions like less, v
     terminal_bench_tasks = terminal_bench_dataset._tasks[::-1]
 
     trainset = [
-        TerminalBenchTask(task_id=task.name, model_name=args.model_name)
-        for task in terminal_bench_tasks[30:50]
+        TerminalBenchTask(task_id=task.name, model_name=args.model_name) for task in terminal_bench_tasks[30:50]
     ]
-    valset = [
-        TerminalBenchTask(task_id=task.name, model_name=args.model_name)
-        for task in terminal_bench_tasks[:30]
-    ]
+    valset = [TerminalBenchTask(task_id=task.name, model_name=args.model_name) for task in terminal_bench_tasks[:30]]
 
     testset = [
         TerminalBenchTask(task_id=task.name, model_name=args.model_name)
@@ -112,12 +103,8 @@ One thing to be very careful about is handling interactive sessions like less, v
         .message.content
     )
 
-    adapter = TerminusAdapter(
-        n_concurrent=args.n_concurrent, instruction_prompt_path=INSTRUCTION_PROMPT_PATH
-    )
-    testset_results_no_prompt = adapter.evaluate(
-        testset, {"instruction_prompt": ""}, capture_traces=True
-    )
+    adapter = TerminusAdapter(n_concurrent=args.n_concurrent, instruction_prompt_path=INSTRUCTION_PROMPT_PATH)
+    testset_results_no_prompt = adapter.evaluate(testset, {"instruction_prompt": ""}, capture_traces=True)
     testset_results_before_opt = adapter.evaluate(
         testset,
         {"instruction_prompt": initial_prompt_from_terminus},
@@ -127,10 +114,7 @@ One thing to be very careful about is handling interactive sessions like less, v
     with open("gepa_terminus/testset_results_no_prompt.json", "w") as f:
         json.dump(
             {
-                "score": sum(
-                    trajectory["success"]
-                    for trajectory in testset_results_no_prompt.trajectories
-                ),
+                "score": sum(trajectory["success"] for trajectory in testset_results_no_prompt.trajectories),
                 "trajectories": testset_results_no_prompt.trajectories,
             },
             f,
@@ -139,10 +123,7 @@ One thing to be very careful about is handling interactive sessions like less, v
     with open("gepa_terminus/testset_results_before_opt.json", "w") as f:
         json.dump(
             {
-                "score": sum(
-                    trajectory["success"]
-                    for trajectory in testset_results_before_opt.trajectories
-                ),
+                "score": sum(trajectory["success"] for trajectory in testset_results_before_opt.trajectories),
                 "trajectories": testset_results_before_opt.trajectories,
             },
             f,
@@ -172,13 +153,9 @@ One thing to be very careful about is handling interactive sessions like less, v
     with open("gepa_terminus/optimized_results.json", "w") as f:
         json.dump(
             {
-                "score": sum(
-                    trajectory["success"]
-                    for trajectory in testset_results_after_opt.trajectories
-                ),
+                "score": sum(trajectory["success"] for trajectory in testset_results_after_opt.trajectories),
                 "trajectories": testset_results_after_opt.trajectories,
             },
             f,
             indent=4,
         )
-
