@@ -11,11 +11,13 @@ RECORDER_DIR = Path(__file__).parent
 
 # --- Pytest Fixtures ---
 
+
 @pytest.fixture(scope="module")
 def recorder_dir() -> Path:
     """Provides the path to the recording directory and ensures it exists."""
     RECORDER_DIR.mkdir(parents=True, exist_ok=True)
     return RECORDER_DIR
+
 
 @pytest.fixture(scope="module")
 def mocked_lms(recorder_dir):
@@ -49,20 +51,14 @@ def mocked_lms(recorder_dir):
         def task_lm(messages):
             key = get_task_key(messages)
             if key not in cache:
-                response = litellm.completion(
-                    model="openai/gpt-4.1-nano",
-                    messages=messages
-                )
+                response = litellm.completion(model="openai/gpt-4.1-nano", messages=messages)
                 cache[key] = response.choices[0].message.content.strip()
             return cache[key]
 
         def reflection_lm(prompt):
             key = get_reflection_key(prompt)
             if key not in cache:
-                response = litellm.completion(
-                    model="openai/gpt-4.1",
-                    messages=[{"role": "user", "content": prompt}]
-                )
+                response = litellm.completion(model="openai/gpt-4.1", messages=[{"role": "user", "content": prompt}])
                 cache[key] = response.choices[0].message.content.strip()
             return cache[key]
 
@@ -80,10 +76,7 @@ def mocked_lms(recorder_dir):
             with open(cache_file) as f:
                 cache = json.load(f)
         except FileNotFoundError:
-            pytest.fail(
-                f"Cache file not found: {cache_file}. "
-                "Run with 'RECORD_TESTS=true pytest' to generate it."
-            )
+            pytest.fail(f"Cache file not found: {cache_file}. Run with 'RECORD_TESTS=true pytest' to generate it.")
 
         def task_lm(messages):
             key = get_task_key(messages)
@@ -99,7 +92,9 @@ def mocked_lms(recorder_dir):
 
         yield task_lm, reflection_lm
 
+
 # --- The Test Function ---
+
 
 def test_aime_prompt_optimize(mocked_lms, recorder_dir):
     """
@@ -116,7 +111,7 @@ def test_aime_prompt_optimize(mocked_lms, recorder_dir):
     print("Initializing AIME dataset...")
     trainset, valset, _ = gepa.examples.aime.init_dataset()
     trainset = trainset[:10]
-    valset = valset[:10] #[3:8]
+    valset = valset[:10]  # [3:8]
 
     seed_prompt = {
         "system_prompt": "You are a helpful assistant. You are given a question and you need to answer it. The answer should be given at the end of your response in exactly the format '### <final answer>'"
@@ -131,6 +126,7 @@ def test_aime_prompt_optimize(mocked_lms, recorder_dir):
         adapter=adapter,
         max_metric_calls=30,
         reflection_lm=reflection_lm,
+        display_progress_bar=True,
     )
 
     # 3. Assertion: Verify the result against the golden file
