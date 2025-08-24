@@ -2,8 +2,8 @@ name: Lint, Test, and Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    tags: ["v*"]
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:

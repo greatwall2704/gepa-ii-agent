@@ -11,45 +11,29 @@ jobs:
     outputs:
       status_checks_passed: ${{ steps.check_status.outputs.passed }}
     steps:
-      # This workflow should only execute if all workflows from run_tests.yml passed successfully on the current commit
-      - name: Check if all required status checks passed
+      - name: Wait for run_tests workflow
+        id: wait_for_tests
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'Lint, Test, and Build'
+          ref: ${{ github.ref }}
+          wait-interval: 10
+      
+      - name: Check Status
         id: check_status
         run: |
-          # Get the current commit SHA
-          COMMIT_SHA="${{ github.sha }}"
+          # Get the conclusion of the run_tests workflow
+          WORKFLOW_CONCLUSION="${{ steps.wait_for_tests.outputs.conclusion }}"
           
-          # Check if all required status checks have passed
-          # We need to check the following jobs from run_tests.yml:
-          # - fix
-          # - test (for all Python versions: 3.10, 3.11, 3.12, 3.13)
-          # - build_package (for all Python versions: 3.10, 3.11, 3.12, 3.13)
-          
-          # Wait a bit for all status checks to complete
-          sleep 10
-          
-          # Check the status of the workflow run
-          WORKFLOW_STATUS=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/status --jq '.statuses[] | select(.context | contains("fix") or contains("test") or contains("build_package")) | .state' 2>/dev/null || echo "")
-          
-          if [ -z "$WORKFLOW_STATUS" ]; then
-            echo "❌ Could not retrieve status checks for commit $COMMIT_SHA"
-            echo "passed=false" >> "$GITHUB_OUTPUT"
+          if [[ "$WORKFLOW_CONCLUSION" == "success" ]]; then
+            echo "✅ All tests passed"
+            echo "passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Tests failed with conclusion: $WORKFLOW_CONCLUSION"
+            echo "passed=false" >> $GITHUB_OUTPUT
             exit 1
           fi
-          
-          # Check if any status is not 'success'
-          FAILED_CHECKS=$(echo "$WORKFLOW_STATUS" | grep -v "success" || true)
-          
-          if [ -n "$FAILED_CHECKS" ]; then
-            echo "❌ Some required status checks failed:"
-            echo "$FAILED_CHECKS"
-            echo "passed=false" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          
-          echo "✅ All required status checks passed successfully"
-          echo "passed=true" >> "$GITHUB_OUTPUT"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   extract-tag:
     runs-on: ubuntu-latest
