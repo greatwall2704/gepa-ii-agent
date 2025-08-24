@@ -53,9 +53,13 @@ jobs:
           echo "Version to be used for TestPyPI release: $NEW_VERSION"  
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
-        run: sed -i '/#replace_package_version_marker/{n;s/version="[^"]*"/version="${{ needs.extract-tag.outputs.version }}"/;}' pyproject.toml
+        run: sed -i '/#replace_package_version_marker/{n;s/version="[^"]*"/version="${{ steps.check_version.outputs.version }}"/;}' pyproject.toml
       - name: Build a binary wheel
         run: uv run python -m build
+      - name: List built distributions
+        run: ls -la dist/
+      - name: Show package metadata
+        run: uv run python -c "import build; print(build.__version__)"
       # Test the locally built wheel
       - name: Create test environment
         run: uv venv test_before_testpypi
@@ -65,7 +69,7 @@ jobs:
           # Install the locally built wheel and testing dependencies
           WHEEL_FILE=$(ls dist/*.whl | head -1)
           uv pip install "$WHEEL_FILE[dev]" pytest
-          pytest tests/
+          uv run pytest tests/
           deactivate
       # Publish to test-PyPI
       - name: Publish distribution 📦 to test-PyPI
@@ -121,7 +125,7 @@ jobs:
           # Install the locally built wheel and testing dependencies
           WHEEL_FILE=$(ls dist/*.whl | head -1)
           uv pip install "$WHEEL_FILE[dev]" pytest
-          pytest tests/
+          uv run pytest tests/
           deactivate
           rm -r test_before_pypi
       - name: Publish distribution 📦 to PyPI (gepa)
