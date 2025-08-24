@@ -11,100 +11,45 @@ jobs:
     outputs:
       status_checks_passed: ${{ steps.check_status.outputs.passed }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Check if all status checks are passing
+      # This workflow should only execute if all workflows from run_tests.yml passed successfully on the current commit
+      - name: Check if all required status checks passed
         id: check_status
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          # Get the latest commit SHA on main branch
-          git fetch origin main
-          LATEST_COMMIT=$(git rev-parse origin/main)
+          # Get the current commit SHA
+          COMMIT_SHA="${{ github.sha }}"
           
-          echo "Checking status checks for commit: $LATEST_COMMIT"
+          # Check if all required status checks have passed
+          # We need to check the following jobs from run_tests.yml:
+          # - fix
+          # - test (for all Python versions: 3.10, 3.11, 3.12, 3.13)
+          # - build_package (for all Python versions: 3.10, 3.11, 3.12, 3.13)
           
-          # Wait for status checks to complete (with timeout)
-          echo "Waiting for status checks to complete..."
-          for i in {1..30}; do
-            # Check if all required status checks are passing, excluding this workflow
-            # Get all status checks and filter out the current workflow
-            echo "Fetching status checks for commit: $LATEST_COMMIT"
-            
-                      # Get all status checks first
-          ALL_STATUSES=$(gh api repos/${{ github.repository }}/commits/$LATEST_COMMIT/statuses 2>/dev/null || echo "")
-          if [ -z "$ALL_STATUSES" ]; then
-            echo "Failed to fetch status checks from main branch, trying tag commit..."
-            # Try to get status checks from the tag commit itself
-            TAG_COMMIT=$(git rev-parse $GITHUB_REF)
-            ALL_STATUSES=$(gh api repos/${{ github.repository }}/commits/$TAG_COMMIT/statuses 2>/dev/null || echo "")
-            if [ -z "$ALL_STATUSES" ]; then
-              echo "Failed to fetch status checks from GitHub API"
-              echo "This might be a new repository or the API call failed"
-              echo "Assuming all checks passed for new repository"
-              echo "passed=true" >> "$GITHUB_OUTPUT"
-              break
-            fi
-          fi
-            echo "Raw status response: $ALL_STATUSES"
-            
-            # Filter out the current workflow and extract states
-            ALL_CHECKS=$(echo "$ALL_STATUSES" | jq -r '.statuses[] | select(.context != "Publish Python 🐍 distributions 📦 to PyPI") | .state' 2>/dev/null || echo "")
-            
-            # If jq fails or returns empty, try alternative approach
-            if [ -z "$ALL_CHECKS" ]; then
-              echo "jq filtering failed, trying alternative approach..."
-              # Use grep to filter out the current workflow context and extract states
-              ALL_CHECKS=$(echo "$ALL_STATUSES" | grep -o '"state":"[^"]*"' | sed 's/"state":"//g' | sed 's/"//g' | grep -v "Publish Python 🐍 distributions 📦 to PyPI" || echo "")
-            fi
-            
-            # If still empty, check if there are any status checks at all
-            if [ -z "$ALL_CHECKS" ]; then
-              echo "No status checks found, checking if this is a new repository..."
-              # Check if there are any status checks at all
-              TOTAL_STATUSES=$(echo "$ALL_STATUSES" | jq -r '.statuses | length' 2>/dev/null || echo "0")
-              echo "Total status checks found: $TOTAL_STATUSES"
-              
-              # If no status checks, consider it as passed (new repository or no other workflows)
-              if [ "$TOTAL_STATUSES" -eq 0 ]; then
-                echo "No status checks found, assuming all checks passed"
-                echo "passed=true" >> "$GITHUB_OUTPUT"
-                break
-              fi
-            fi
-            
-            echo "Filtered status checks: $ALL_CHECKS"
-            
-            # Debug: Show all status contexts to understand what's being filtered
-            echo "All status contexts:"
-            echo "$ALL_STATUSES" | jq -r '.statuses[] | .context + ": " + .state' 2>/dev/null || echo "Failed to extract contexts"
-            
-            # Check if any non-current workflow checks are still pending
-            PENDING_COUNT=$(echo "$ALL_CHECKS" | grep -c "pending" || echo "0")
-            FAILED_COUNT=$(echo "$ALL_CHECKS" | grep -c "failure\|error" || echo "0")
-            SUCCESS_COUNT=$(echo "$ALL_CHECKS" | grep -c "success" || echo "0")
-            
-            echo "Status check summary: $SUCCESS_COUNT success, $PENDING_COUNT pending, $FAILED_COUNT failed"
-            
-            if [ "$FAILED_COUNT" -gt 0 ]; then
-              echo "Some status checks failed"
-              echo "passed=false" >> "$GITHUB_OUTPUT"
-              exit 1
-            elif [ "$PENDING_COUNT" -eq 0 ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
-              echo "All required status checks are passing"
-              echo "passed=true" >> "$GITHUB_OUTPUT"
-              break
-            else
-              echo "Some status checks still pending... (attempt $i/30)"
-              sleep 10
-            fi
-          done
+          # Wait a bit for all status checks to complete
+          sleep 10
           
-          # If we reach here without setting passed=true, status checks didn't complete in time
-          if [ "$(echo ${{ steps.check_status.outputs.passed }})" != "true" ]; then
-            echo "Status checks did not complete within timeout"
+          # Check the status of the workflow run
+          WORKFLOW_STATUS=$(gh api repos/${{ github.repository }}/commits/$COMMIT_SHA/status --jq '.statuses[] | select(.context | contains("fix") or contains("test") or contains("build_package")) | .state' 2>/dev/null || echo "")
+          
+          if [ -z "$WORKFLOW_STATUS" ]; then
+            echo "❌ Could not retrieve status checks for commit $COMMIT_SHA"
             echo "passed=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
+          
+          # Check if any status is not 'success'
+          FAILED_CHECKS=$(echo "$WORKFLOW_STATUS" | grep -v "success" || true)
+          
+          if [ -n "$FAILED_CHECKS" ]; then
+            echo "❌ Some required status checks failed:"
+            echo "$FAILED_CHECKS"
+            echo "passed=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          
+          echo "✅ All required status checks passed successfully"
+          echo "passed=true" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   extract-tag:
     runs-on: ubuntu-latest
