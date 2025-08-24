@@ -49,7 +49,7 @@ jobs:
           VERSION=${{ needs.extract-tag.outputs.version }}  
           PACKAGE_NAME="gepa"
           echo "Checking if $VERSION for $PACKAGE_NAME exists on TestPyPI"  
-          NEW_VERSION=$(python3 .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
+          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
           echo "Version to be used for TestPyPI release: $NEW_VERSION"  
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
@@ -105,7 +105,7 @@ jobs:
           VERSION=${{ needs.extract-tag.outputs.version }}  
           PACKAGE_NAME="gepa"
           echo "Checking if $VERSION for $PACKAGE_NAME exists on PyPI"  
-          NEW_VERSION=$(python3 .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
+          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
           echo "Version to be used for PyPI release: $NEW_VERSION"  
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
