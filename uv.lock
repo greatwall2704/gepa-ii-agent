@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.10, <3.14"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'linux'",
@@ -571,6 +571,7 @@ dev = [
     { name = "ruff" },
     { name = "semver" },
     { name = "setuptools" },
+    { name = "tqdm" },
     { name = "twine" },
     { name = "wandb" },
     { name = "wheel" },
@@ -578,12 +579,14 @@ dev = [
 full = [
     { name = "datasets" },
     { name = "litellm" },
+    { name = "tqdm" },
     { name = "wandb" },
 ]
 test = [
     { name = "datasets" },
     { name = "litellm" },
     { name = "pytest" },
+    { name = "tqdm" },
     { name = "wandb" },
 ]
 
@@ -603,6 +606,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.3.0" },
     { name = "semver", marker = "extra == 'build'" },
     { name = "setuptools", marker = "extra == 'build'", specifier = ">=77.0.1" },
+    { name = "tqdm", marker = "extra == 'full'", specifier = ">=4.66.1" },
     { name = "twine", marker = "extra == 'build'" },
     { name = "wandb", marker = "extra == 'full'" },
     { name = "wheel", marker = "extra == 'build'" },

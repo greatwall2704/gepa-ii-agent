@@ -23,7 +23,8 @@ dependencies = []
 full = [
     "litellm>=1.64.0",
     "datasets>=2.14.6",
-    "wandb"
+    "wandb",
+    "tqdm>=4.66.1"
 ]
 dspy = []
 test = [
