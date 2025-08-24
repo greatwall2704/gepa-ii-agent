@@ -164,13 +164,12 @@ def optimize(
         reflection_lm=reflection_lm,
     )
 
+    def evaluator(inputs, prog):
+        eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
+        return eval_out.outputs, eval_out.scores
+
     merge_proposer = None
     if use_merge:
-
-        def evaluator(inputs, prog):
-            eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
-            return eval_out.outputs, eval_out.scores
-
         merge_proposer = MergeProposer(
             logger=logger,
             valset=valset,
@@ -180,13 +179,9 @@ def optimize(
             rng=rng,
         )
 
-    def full_eval(inputs, prog):
-        eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
-        return eval_out.outputs, eval_out.scores
-
     engine = GEPAEngine(
         run_dir=run_dir,
-        evaluator=full_eval,
+        evaluator=evaluator,
         valset=valset,
         seed_candidate=seed_candidate,
         max_metric_calls=max_metric_calls,
