@@ -23,22 +23,18 @@ def optimize(
     valset: list[DataInst] | None = None,
     adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
     task_lm: str | None = None,
-
     # Reflection-based configuration
     reflection_lm: LanguageModel | str | None = None,
     candidate_selection_strategy: str = "pareto",
     skip_perfect_score=True,
     reflection_minibatch_size=3,
     perfect_score=1,
-
     # Merge-based configuration
     use_merge=False,
     max_merge_invocations=5,
-
     # Budget
     num_iters=None,
     max_metric_calls=None,
-
     # Logging
     logger: LoggerProtocol | None = None,
     run_dir: str | None = None,
@@ -46,13 +42,13 @@ def optimize(
     wandb_api_key: str | None = None,
     wandb_init_kwargs: dict[str, Any] | None = None,
     track_best_outputs: bool = False,
-
     # Reproducibility
     seed: int = 0,
+    raise_on_exception: bool = True,
 ):
     """
     GEPA is an evolutionary optimizer that evolves (multiple) text components of a complex system to optimize them towards a given metric.
-    GEPA can also leverage rich textual feedback obtained from the system's execution environment, evaluation, 
+    GEPA can also leverage rich textual feedback obtained from the system's execution environment, evaluation,
     and the system's own execution traces to iteratively improve the system's performance.
 
     Concepts:
@@ -98,7 +94,7 @@ def optimize(
     - skip_perfect_score: Whether to skip updating the candidate if it achieves a perfect score on the minibatch.
     - reflection_minibatch_size: The number of examples to use for reflection in each proposal step.
     - perfect_score: The perfect score to achieve.
-    
+
     # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
     - max_merge_invocations: The maximum number of merge invocations to perform.
@@ -119,19 +115,31 @@ def optimize(
     - seed: The seed to use for the random number generator.
     """
     if adapter is None:
-        assert task_lm is not None, "Since no adapter is provided, GEPA requires a task LM to be provided. Please set the `task_lm` parameter."
+        assert task_lm is not None, (
+            "Since no adapter is provided, GEPA requires a task LM to be provided. Please set the `task_lm` parameter."
+        )
         adapter = DefaultAdapter(model=task_lm)
     else:
-        assert task_lm is None, "Since an adapter is provided, GEPA does not require a task LM to be provided. Please set the `task_lm` parameter to None."
+        assert task_lm is None, (
+            "Since an adapter is provided, GEPA does not require a task LM to be provided. Please set the `task_lm` parameter to None."
+        )
 
-    assert (max_metric_calls is not None) + (num_iters is not None) == 1, \
+    assert (max_metric_calls is not None) + (num_iters is not None) == 1, (
         f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
-    assert reflection_lm is not None, "GEPA currently requires a reflection LM to be provided. We will soon support simpler application without specifying a reflection LM."
+    )
+    assert reflection_lm is not None, (
+        "GEPA currently requires a reflection LM to be provided. We will soon support simpler application without specifying a reflection LM."
+    )
 
     if isinstance(reflection_lm, str):
         import litellm
+
         reflection_lm_name = reflection_lm
-        reflection_lm = lambda prompt: litellm.completion(model=reflection_lm_name, messages=[{"role": "user", "content": prompt}]).choices[0].message.content
+        reflection_lm = (
+            lambda prompt: litellm.completion(model=reflection_lm_name, messages=[{"role": "user", "content": prompt}])
+            .choices[0]
+            .message.content
+        )
 
     if logger is None:
         logger = StdOutLogger()
@@ -140,7 +148,9 @@ def optimize(
         valset = trainset
 
     rng = random.Random(seed)
-    candidate_selector = ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
+    candidate_selector = (
+        ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
+    )
     module_selector = RoundRobinReflectionComponentSelector()
     batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size, rng=rng)
 
@@ -159,6 +169,7 @@ def optimize(
 
     merge_proposer = None
     if use_merge:
+
         def evaluator(inputs, prog):
             eval_out = adapter.evaluate(inputs, prog, capture_traces=False)
             return eval_out.outputs, eval_out.scores
@@ -192,6 +203,7 @@ def optimize(
         wandb_api_key=wandb_api_key,
         wandb_init_kwargs=wandb_init_kwargs,
         track_best_outputs=track_best_outputs,
+        raise_on_exception=raise_on_exception,
     )
     state = engine.run()
     result = GEPAResult.from_state(state)
