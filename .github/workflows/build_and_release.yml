@@ -26,19 +26,27 @@ jobs:
           # Wait for status checks to complete (with timeout)
           echo "Waiting for status checks to complete..."
           for i in {1..30}; do
-            # Check if all required status checks are passing
-            STATUS=$(gh api repos/${{ github.repository }}/commits/$LATEST_COMMIT/status --jq '.state')
+            # Check if all required status checks are passing, excluding this workflow
+            # Get all status checks and filter out the current workflow
+            ALL_CHECKS=$(gh api repos/${{ github.repository }}/commits/$LATEST_COMMIT/statuses --jq '.statuses[] | select(.context != "Publish Python 🐍 distributions 📦 to PyPI") | .state')
             
-            if [ "$STATUS" = "success" ]; then
-              echo "All status checks are passing"
-              echo "passed=true" >> "$GITHUB_OUTPUT"
-              break
-            elif [ "$STATUS" = "failure" ] || [ "$STATUS" = "error" ]; then
-              echo "Status checks failed"
+            # Check if any non-current workflow checks are still pending
+            PENDING_COUNT=$(echo "$ALL_CHECKS" | grep -c "pending" || echo "0")
+            FAILED_COUNT=$(echo "$ALL_CHECKS" | grep -c "failure\|error" || echo "0")
+            SUCCESS_COUNT=$(echo "$ALL_CHECKS" | grep -c "success" || echo "0")
+            
+            echo "Status check summary: $SUCCESS_COUNT success, $PENDING_COUNT pending, $FAILED_COUNT failed"
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              echo "Some status checks failed"
               echo "passed=false" >> "$GITHUB_OUTPUT"
               exit 1
+            elif [ "$PENDING_COUNT" -eq 0 ] && [ "$SUCCESS_COUNT" -gt 0 ]; then
+              echo "All required status checks are passing"
+              echo "passed=true" >> "$GITHUB_OUTPUT"
+              break
             else
-              echo "Status checks still pending... (attempt $i/30)"
+              echo "Some status checks still pending... (attempt $i/30)"
               sleep 10
             fi
           done
