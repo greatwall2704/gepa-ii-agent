@@ -12,6 +12,12 @@ from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMuta
 
 from .adapter import DataInst, RolloutOutput, Trajectory
 
+# Import tqdm for progress bar functionality
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+
 
 class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
     """
@@ -25,7 +31,6 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         valset: list[DataInst] | None,
         seed_candidate: dict[str, str],
         # Controls
-        num_iters: int | None,
         max_metric_calls: int | None,
         perfect_score: float,
         seed: int,
@@ -38,12 +43,11 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         wandb_api_key: str | None = None,
         wandb_init_kwargs: dict[str, Any] | None = None,
         track_best_outputs: bool = False,
+        display_progress_bar: bool = False,
         raise_on_exception: bool = True,
     ):
-        # Budget constraint: exactly one of max_metric_calls or num_iters must be set
-        assert (max_metric_calls is not None) + (num_iters is not None) == 1, (
-            f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
-        )
+        # Budget constraint: max_metric_calls must be set
+        assert max_metric_calls is not None, "max_metric_calls must be set"
 
         self.logger = logger
         self.run_dir = run_dir
@@ -51,11 +55,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         self.valset = valset
         self.seed_candidate = seed_candidate
 
-        self.num_iters = num_iters
         self.max_metric_calls = max_metric_calls
-        assert (self.num_iters is not None) + (self.max_metric_calls is not None) == 1, (
-            f"Exactly one of num_iters or max_metric_calls should be set. You set num_iters={self.num_iters}, max_metric_calls={self.max_metric_calls}"
-        )
 
         self.perfect_score = perfect_score
         self.use_wandb = use_wandb
@@ -71,6 +71,8 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             self.merge_proposer.last_iter_found_new_program = False
 
         self.track_best_outputs = track_best_outputs
+        self.display_progress_bar = display_progress_bar
+
         self.raise_on_exception = raise_on_exception
 
     def _val_evaluator(self) -> Callable[[dict[str, str]], tuple[list[RolloutOutput], list[float]]]:
@@ -124,6 +126,16 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         if self.use_wandb:
             initialize_wandb(wandb_api_key=self.wandb_api_key, wandb_init_kwargs=self.wandb_init_kwargs)
 
+        # Check tqdm availability if progress bar is enabled
+        progress_bar = None
+        if self.display_progress_bar:
+            if tqdm is None:
+                raise ImportError("tqdm must be installed when display_progress_bar is enabled")
+            # Initialize progress bar
+            progress_bar = tqdm(total=self.max_metric_calls, desc="GEPA Optimization", unit="rollouts")
+            progress_bar.update(0)
+            last_pbar_val = 0
+
         # Prepare valset
         if self.valset is None:
             raise ValueError("valset must be provided to GEPAEngine.run()")
@@ -148,6 +160,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
                     "iteration": state.i + 1,
                 }
             )
+
         self.logger.log(
             f"Iteration {state.i + 1}: Base program full valset score: {state.program_full_scores_val_set[0]}"
         )
@@ -157,9 +170,12 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             self.merge_proposer.last_iter_found_new_program = False
 
         # Main loop
-        while (self.num_iters is None or state.num_full_ds_evals < self.num_iters) and (
-            self.max_metric_calls is None or state.total_num_evals < self.max_metric_calls
-        ):
+        while state.total_num_evals < self.max_metric_calls:
+            if self.display_progress_bar:
+                delta = state.total_num_evals - last_pbar_val
+                progress_bar.update(delta)
+                last_pbar_val = state.total_num_evals
+
             assert state.is_consistent()
             try:
                 state.save(self.run_dir)
@@ -186,6 +202,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
                                 )
                                 self.merge_proposer.merges_due -= 1
                                 self.merge_proposer.total_merges_tested += 1
+
                                 # Skip reflective this iteration (old behavior)
                                 continue
                             else:
@@ -229,6 +246,11 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
                     raise e
                 else:
                     continue
+
+        # Close progress bar if it exists
+        if self.display_progress_bar:
+            progress_bar.update(self.max_metric_calls - state.total_num_evals)
+            progress_bar.close()
 
         state.save(self.run_dir)
         return state

@@ -33,7 +33,6 @@ def optimize(
     use_merge=False,
     max_merge_invocations=5,
     # Budget
-    num_iters=None,
     max_metric_calls=None,
     # Logging
     logger: LoggerProtocol | None = None,
@@ -42,6 +41,7 @@ def optimize(
     wandb_api_key: str | None = None,
     wandb_init_kwargs: dict[str, Any] | None = None,
     track_best_outputs: bool = False,
+    display_progress_bar: bool = False,
     # Reproducibility
     seed: int = 0,
     raise_on_exception: bool = True,
@@ -100,7 +100,6 @@ def optimize(
     - max_merge_invocations: The maximum number of merge invocations to perform.
 
     # Budget
-    - num_iters: The number of iterations to run.
     - max_metric_calls: The maximum number of metric calls to perform.
 
     # Logging
@@ -124,9 +123,7 @@ def optimize(
             "Since an adapter is provided, GEPA does not require a task LM to be provided. Please set the `task_lm` parameter to None."
         )
 
-    assert (max_metric_calls is not None) + (num_iters is not None) == 1, (
-        f"Exactly one of max_metric_calls or num_iters should be set. You set max_metric_calls={max_metric_calls}, num_iters={num_iters}"
-    )
+    assert max_metric_calls is not None, "max_metric_calls must be set"
     assert reflection_lm is not None, (
         "GEPA currently requires a reflection LM to be provided. We will soon support simpler application without specifying a reflection LM."
     )
@@ -192,7 +189,6 @@ def optimize(
         evaluator=full_eval,
         valset=valset,
         seed_candidate=seed_candidate,
-        num_iters=num_iters,
         max_metric_calls=max_metric_calls,
         perfect_score=perfect_score,
         seed=seed,
@@ -203,6 +199,7 @@ def optimize(
         wandb_api_key=wandb_api_key,
         wandb_init_kwargs=wandb_init_kwargs,
         track_best_outputs=track_best_outputs,
+        display_progress_bar=display_progress_bar,
         raise_on_exception=raise_on_exception,
     )
     state = engine.run()
