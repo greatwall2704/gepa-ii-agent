@@ -11,26 +11,76 @@ jobs:
     outputs:
       status_checks_passed: ${{ steps.check_status.outputs.passed }}
     steps:
-      - name: Wait for run_tests workflow
-        id: wait_for_tests
+      - name: Wait for Check Ruff Fix
+        id: wait_for_ruff
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          check-name: 'Lint, Test, and Build'
+          check-name: 'Check Ruff Fix'
+          ref: ${{ github.ref }}
+          wait-interval: 10
+      
+      - name: Wait for Run Tests (3.10)
+        id: wait_for_tests_310
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'Run Tests (3.10)'
+          ref: ${{ github.ref }}
+          wait-interval: 10
+      
+      - name: Wait for Run Tests (3.11)
+        id: wait_for_tests_311
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'Run Tests (3.11)'
+          ref: ${{ github.ref }}
+          wait-interval: 10
+      
+      - name: Wait for Run Tests (3.12)
+        id: wait_for_tests_312
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'Run Tests (3.12)'
+          ref: ${{ github.ref }}
+          wait-interval: 10
+      
+      - name: Wait for Run Tests (3.13)
+        id: wait_for_tests_313
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          check-name: 'Run Tests (3.13)'
           ref: ${{ github.ref }}
           wait-interval: 10
       
       - name: Check Status
         id: check_status
         run: |
-          # Get the conclusion of the run_tests workflow
-          WORKFLOW_CONCLUSION="${{ steps.wait_for_tests.outputs.conclusion }}"
+          # Get the conclusion of all the individual job checks
+          RUFF_CONCLUSION="${{ steps.wait_for_ruff.outputs.conclusion }}"
+          TESTS_310_CONCLUSION="${{ steps.wait_for_tests_310.outputs.conclusion }}"
+          TESTS_311_CONCLUSION="${{ steps.wait_for_tests_311.outputs.conclusion }}"
+          TESTS_312_CONCLUSION="${{ steps.wait_for_tests_312.outputs.conclusion }}"
+          TESTS_313_CONCLUSION="${{ steps.wait_for_tests_313.outputs.conclusion }}"
           
-          if [[ "$WORKFLOW_CONCLUSION" == "success" ]]; then
+          # Check if all checks passed
+          if [[ "$RUFF_CONCLUSION" == "success" && \
+                "$TESTS_310_CONCLUSION" == "success" && \
+                "$TESTS_311_CONCLUSION" == "success" && \
+                "$TESTS_312_CONCLUSION" == "success" && \
+                "$TESTS_313_CONCLUSION" == "success" ]]; then
             echo "✅ All tests passed"
             echo "passed=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ Tests failed with conclusion: $WORKFLOW_CONCLUSION"
+            echo "❌ Some tests failed:"
+            echo "  - Check Ruff Fix: $RUFF_CONCLUSION"
+            echo "  - Run Tests (3.10): $TESTS_310_CONCLUSION"
+            echo "  - Run Tests (3.11): $TESTS_311_CONCLUSION"
+            echo "  - Run Tests (3.12): $TESTS_312_CONCLUSION"
+            echo "  - Run Tests (3.13): $TESTS_313_CONCLUSION"
             echo "passed=false" >> $GITHUB_OUTPUT
             exit 1
           fi
