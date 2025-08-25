@@ -1,4 +1,8 @@
 ---
+# Versioning Strategy:
+# - TestPyPI: Auto-increments versions if conflicts exist (e.g., 1.0.0 -> 1.0.0a1 -> 1.0.0a2)
+# - PyPI: Always uses exact tag version (e.g., v1.0.0 -> 1.0.0), fails if version exists
+# - Git operations: Use original tag version for branch names and merge messages
 name: Publish Python 🐍 distributions 📦 to PyPI
 on:
   push:
@@ -31,6 +35,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.PUSH_KEY }}
+      - name: Configure git
+        run: |
+          git config --global user.email "lakshyaaagrawal+gepabot@berkeley.edu"
+          git config --global user.name "gepa-bot"
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -43,13 +53,13 @@ jobs:
         run: uv venv
       - name: Install build dependencies
         run: uv pip install ".[build]"
-      - name: Get correct version for TestPyPI release
+      - name: Get correct version for TestPyPI release (auto-increment if exists)
         id: check_version
         run: |
           VERSION=${{ needs.extract-tag.outputs.version }}  
           PACKAGE_NAME="gepa"
           echo "Checking if $VERSION for $PACKAGE_NAME exists on TestPyPI"  
-          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
+          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION https://test.pypi.org)  
           echo "Version to be used for TestPyPI release: $NEW_VERSION"  
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
@@ -77,6 +87,14 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
 
+      # Create and push to release-test branch (no merge to main)
+      - name: Create release-test branch and push changes
+        run: |
+          git checkout -b release-test-${{ needs.extract-tag.outputs.version }}
+          git add pyproject.toml
+          git commit -m "Update version to ${{ steps.check_version.outputs.version }} for test PyPI (from tag ${{ needs.extract-tag.outputs.version }})"
+          git push origin release-test-${{ needs.extract-tag.outputs.version }}
+
   # TODO: Add tests using gepa
 
   build-and-publish-pypi:
@@ -91,6 +109,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.PUSH_KEY }}
+      - name: Configure git
+        run: |
+          git config --global user.email "lakshyaaagrawal+gepabot@berkeley.edu"
+          git config --global user.name "gepa-bot"
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -103,15 +127,26 @@ jobs:
         run: uv venv
       - name: Install build dependencies
         run: uv pip install ".[build]"
-      - name: Get correct version for PyPI release
+      - name: Set version for PyPI release (always use tag version)
         id: check_version
         run: |
           VERSION=${{ needs.extract-tag.outputs.version }}  
           PACKAGE_NAME="gepa"
-          echo "Checking if $VERSION for $PACKAGE_NAME exists on PyPI"  
-          NEW_VERSION=$(uv run python .github/workflows/build_utils/test_version.py $PACKAGE_NAME $VERSION)  
-          echo "Version to be used for PyPI release: $NEW_VERSION"  
-          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Using exact tag version for PyPI release: $VERSION"
+          
+          # Check if this exact version already exists on PyPI
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PACKAGE_NAME/$VERSION/json")
+          if [ "$HTTP_STATUS" = "404" ]; then
+            echo "✅ Version $VERSION does not exist on PyPI, proceeding..."
+          elif [ "$HTTP_STATUS" = "200" ]; then
+            echo "❌ Version $VERSION already exists on PyPI!"
+            echo "Please create a new tag with a different version number."
+            exit 1
+          else
+            echo "⚠️ Unable to check PyPI (HTTP $HTTP_STATUS), proceeding with caution..."
+          fi
+          
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Update version in pyproject.toml
         run: sed -i '/#replace_package_version_marker/{n;s/version="[^"]*"/version="${{ steps.check_version.outputs.version }}"/;}' pyproject.toml
       - name: Build a binary wheel
@@ -132,22 +167,19 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           attestations: false
-      - uses: stefanzweifel/git-auto-commit-action@v5 # auto commit changes to main
-        with:
-          commit_message: Update versions
-          create_branch: true
-          branch: release-${{ needs.extract-tag.outputs.version }}
-      - name: Checkout main branch
+      
+      # Create and push to release branch
+      - name: Create release branch and push changes
         run: |
-          git fetch origin
+          git checkout -b release-${{ needs.extract-tag.outputs.version }}
+          git add pyproject.toml
+          git commit -m "Update version to ${{ steps.check_version.outputs.version }} (from tag ${{ needs.extract-tag.outputs.version }})"
+          git push origin release-${{ needs.extract-tag.outputs.version }}
+
+      # Merge to main
+      - name: Merge release branch to main
+        run: |
           git checkout main
-      - name: Configure git user
-        run: |
-          git config --global user.email "actions@github.com"
-          git config --global user.name "Github Actions"
-      - name: Merge release branch into main
-        run: |
-          git merge --no-ff release-${{ needs.extract-tag.outputs.version }}
-      - name: Push changes to main
-        run: |
+          git pull origin main
+          git merge --no-ff release-${{ needs.extract-tag.outputs.version }} -m "Merge release ${{ needs.extract-tag.outputs.version }}"
           git push origin main

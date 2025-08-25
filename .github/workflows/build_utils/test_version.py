@@ -7,9 +7,9 @@ import semver
 from packaging.version import Version as PyPIVersion
 
 
-def get_latest_version(package_name, tag_version):
+def get_latest_version(package_name, tag_version, pypi_url="https://pypi.org"):
     # Returns latest version, and T/F as to whether it needs to be incremented
-    response = requests.get(f"https://test.pypi.org/pypi/{package_name}/json")
+    response = requests.get(f"{pypi_url}/pypi/{package_name}/json")
     if response.status_code == 200:
         data = response.json()
         # Flatten the list of files for all releases and get the latest upload
@@ -47,13 +47,14 @@ def increment_version(curr_version):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        raise ValueError("Usage: python get_latest_testpypi_version.py <package_name> <tag_version>")
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        raise ValueError("Usage: python test_version.py <package_name> <tag_version> [pypi_url]")
 
     package_name = sys.argv[1]
     tag_v = sys.argv[2]
+    pypi_url = sys.argv[3] if len(sys.argv) == 4 else "https://pypi.org"
 
-    latest_version, increment = get_latest_version(package_name, tag_v)
+    latest_version, increment = get_latest_version(package_name, tag_v, pypi_url)
     if increment:
         new_version = increment_version(latest_version)
     else:
