@@ -11,7 +11,7 @@ on:
 jobs:
   extract-tag:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'gepa-ai'
+    if: github.repository_owner == 'gepa-ai' && startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
     outputs:
       version: ${{ steps.extract_tag.outputs.tag }}
     steps:
@@ -26,7 +26,7 @@ jobs:
 
   build-and-publish-test-pypi:
     needs: [extract-tag]
-    if: github.repository_owner == 'gepa-ai'
+    if: github.repository_owner == 'gepa-ai' && startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -100,7 +100,7 @@ jobs:
   build-and-publish-pypi:
     needs: [extract-tag, build-and-publish-test-pypi]
     # Only publish to PyPI if the repository owner is gepa-ai and status checks pass
-    if: github.repository_owner == 'gepa-ai'
+    if: github.repository_owner == 'gepa-ai' && startsWith(github.ref, 'refs/tags/v') && github.event.base_ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -111,6 +111,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ssh-key: ${{ secrets.PUSH_KEY }}
+          fetch-depth: 0
       - name: Configure git
         run: |
           git config --global user.email "lakshyaaagrawal+gepabot@berkeley.edu"
