@@ -249,7 +249,6 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
         # Close progress bar if it exists
         if self.display_progress_bar:
-            progress_bar.update(self.max_metric_calls - state.total_num_evals)
             progress_bar.close()
 
         state.save(self.run_dir)
