@@ -13,7 +13,7 @@ Signatures define LM tasks via typed input/output fields and instructions.
 
 Simple Signatures: `"input1, ..., inputN -> output1, ..., outputM"`. Example: `"topic -> tweet"` defines a simple signature that takes a topic as input and generates a tweet as output.
 
-Typed Signatures: A class that inherits from `dspy.Signature`. Class docstring can provide detailed LM instructions; `dspy.InputField`/`dspy.OutputField` with `desc` and pydantic types (e.g., `str`, `List[str]`, `Literal`).
+Typed Signatures: A class that inherits from `dspy.Signature`. Class docstring can provide detailed LM instructions; `dspy.InputField`/`dspy.OutputField` with `desc` and pydantic types (e.g., `str`, `List[str]`, `Literal`). Note that any details about the task, instructions, common pitfalls, suggestions on how to solve the task must be provided in the docstring.
 
 Example:
 ```
@@ -33,20 +33,20 @@ Typed by signature; inputs as kwargs matching input fields; outputs as `dspy.Pre
 
 #### Basic Modules
 - `dspy.Predict(signature)`: Defines a single LM call for a signature providing the inputs and expect the LM to directly output all the output fields.
-- `dspy.ChainOfThought(signature)`: Defines a single LM calls, where the LM receives the inputs and is expected to first generate a reasoning chain, and then output all the output fields.
+- `dspy.ChainOfThought(signature)`: Defines a single LM calls, where the LM receives the inputs and first generates a reasoning chain, and then output all the output fields. The output will contains `reasoning` in addition to the output fields defined in the signature.
 
 Example:
 ```
 program = dspy.Predict(ArticleAnalysis) # Or dspy.ChainOfThought(ArticleAnalysis)
 # Can be called like:
 # pred = program(article_text="LLMs on consumer hardware...")
-# print(pred.topic, pred.key_points)
+# print(pred.topic, pred.key_points) # pred.reasoning will contain the reasoning chain.
 ```
 
 #### Custom Modules
-For more complex tasks, the workflow can be defined by creating a custom module. Inherit `dspy.Module`; `__init__` initializes sub-modules; `forward` defines data flow, returning `dspy.Prediction`. forward receives inputs as kwargs matching input fields and returns dspy.Prediction with output fields.
+More complex workflows can be defined by creating a custom module. Inherit `dspy.Module`; `__init__` initializes sub-modules; `forward` defines data flow and task breakdown, returning `dspy.Prediction`. forward receives inputs as kwargs matching input fields and returns dspy.Prediction with output fields.
 
-Example: Summarize then extract takeaways.
+Example: 2 stage article analysis.
 ```
 class ArticleAnalysis2Stage(dspy.Module):
     def __init__(self):
@@ -54,8 +54,8 @@ class ArticleAnalysis2Stage(dspy.Module):
         self.key_points_extractor = dspy.Predict("article_text -> key_points: List[str]")
         self.topic_extractor = dspy.Predict("key_points: List[str] -> topic")
 
-    def forward(self, document):
-        key_points_pred = self.key_points_extractor(document=document)
+    def forward(self, article_text):
+        key_points_pred = self.key_points_extractor(article_text=article_text)
         topic_pred = self.topic_extractor(key_points=key_points_pred.key_points)
         return dspy.Prediction(topic=topic_pred.topic, key_points=key_points_pred.key_points)
 
@@ -65,7 +65,7 @@ program = ArticleAnalysis2Stage()
 # print(pred.topic, pred.key_points)
 ```
 
-I am trying to solve a task using the DSPy AI framework. Here's my current code:
+I am trying to solve a task using the DSPy framework. Here's my current code:
 ```
 <curr_program>
 ```
@@ -75,7 +75,7 @@ Here is the execution trace of the current code on some example inputs, their co
 <dataset_with_feedback>
 ```
 
-Propose a new version of the code that improves the performance of the current code. Ensure that the new code is a drop-in replacement for the current code, including creating a `program` object that will be used to solve the task. Respond with exactly one code block at the end, within ```. Do not include language marker in the code block."""
+Propose a new version of the code that improves the performance of the current code. Identify ways to change the workflow, and decompose the task to make it easier for the LM to solve. Identify information that could help the LM solve the task better, and add it to the docstring. Think about what modules could be defined. Note that you can execute any standard python code within custom modules. Ensure that the new code is a drop-in replacement for the current code, including creating a `program` object that will be used to solve the task. Respond with exactly one code block at the end, within ```. Do not include language marker in the code block."""
     input_keys = ["curr_program", "dataset_with_feedback"]
     output_keys = ["new_program"]
 
