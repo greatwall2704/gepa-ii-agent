@@ -8,7 +8,7 @@
   <em>Optimize text components—AI prompts, code, or instructions—of any system using reflective text evolution.</em>
 </p>
 
-[![PyPI - Version](https://img.shields.io/pypi/v/gepa)](https://pypi.org/project/gepa/) [![PyPI Downloads](https://static.pepy.tech/badge/gepa)](https://pepy.tech/projects/gepa)
+[![PyPI - Version](https://img.shields.io/pypi/v/gepa)](https://pypi.org/project/gepa/) [![PyPI Downloads](https://static.pepy.tech/badge/gepa)](https://pepy.tech/projects/gepa) [![Join the #gepa channel in our Discord](https://dcbadge.limes.pink/api/server/https://discord.gg/A7dABbtmFw?style=flat)](https://discord.gg/A7dABbtmFw)
 
 ## Overview
 
@@ -256,26 +256,20 @@ We encourage the community and users to help us develop adapters to allow GEPA t
 
 ## Further Reading
 
-- **Paper:**  📄 [GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning (arXiv:2507.19457)](https://arxiv.org/abs/2507.19457)  
-  The paper describing the GEPA algorithm, technical details and experiments.
-
+- **Paper:** 📄 [GEPA: Reflective Prompt Evolution Can Outperform Reinforcement Learning (arXiv:2507.19457)](https://arxiv.org/abs/2507.19457)
+- **Experiment reproduction artifact:** [GEPA Artifact Repository](https://github.com/gepa-ai/gepa-artifact)
 - **Tutorials & Examples:**  
   - [dspy.GEPA Tutorials, with executable notebooks](https://dspy.ai/tutorials/gepa_ai_program/)  
     Step-by-step notebooks showing how to use GEPA for practical optimization tasks via DSPy, including math, structured data extraction for enterprise tasks and privacy conscious delegation task.
-  - [ObservableHQ: JavaScript Implementation of GEPA](https://observablehq.com/@tomlarkworthy/gepa)  
-    Interactive JS-based version and demo.
-
-- **Code & Artifacts:**  
-  - [GEPA Artifact Repository](https://github.com/gepa-ai/gepa-artifact)  
-    Scripts and configs to fully reproduce the experimental results in the GEPA paper.
-
+  - [Video tutorial by @weaviate on using dspy.GEPA to optimize a listwise reranker](https://www.youtube.com/watch?v=H4o7h6ZbA4o)
 - **Social and Discussion:**  
-  - [X (formerly Twitter) Announcement Thread (Lakshya Agrawal)](https://x.com/LakshyAAAgrawal/status/1949867947867984322)  
-    Author’s overview and discussion thread, good for community updates.
+  - [X (formerly Twitter) Announcement Thread (Lakshya A Agrawal)](https://x.com/LakshyAAAgrawal/status/1949867947867984322)  
   - Stay up to date:  
     - [@LakshyAAAgrawal on X (Twitter)](https://x.com/LakshyAAAgrawal)  
     - [@lateinteraction on X (Twitter)](https://twitter.com/lateinteraction)
-
+  - Questions, Discussions?
+    - [Join our Discord for active discussion](https://discord.gg/A7dABbtmFw)
+    - [Open a GitHub issue](https://github.com/gepa-ai/gepa/issues)
 - **GEPA Integrations:**  
   Want to use GEPA in other frameworks?  
   - [DSPy Adapter Code](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) (integrates GEPA with [DSPy](https://dspy.ai/)),  
