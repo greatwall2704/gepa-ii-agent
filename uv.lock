@@ -547,7 +547,7 @@ http = [
 
 [[package]]
 name = "gepa"
-version = "0.0.5a13"
+version = "0.0.7"
 source = { editable = "." }
 
 [package.optional-dependencies]
