@@ -223,6 +223,8 @@ Finally:
 
 GEPA is built around a flexible [GEPAAdapter](src/gepa/core/adapter.py) abstraction that lets it plug into any system and optimize different types of text snippets. The above example used a simple [`DefaultAdapter`](src/gepa/adapters/default_adapter/default_adapter.py) that plugs into a single-turn LLM environment and evolves system prompts, where tasks are presented as user messages. GEPA can be easily extended to multi-turn and other agentic settings. For example, the `dspy.GEPA` integration uses a [DSPyAdapter](https://github.com/stanfordnlp/dspy/blob/main/dspy/teleprompt/gepa/gepa_utils.py#L51).
 
+Beyond prompt optimization, GEPA can evolve entire programs. The [`DSPy Full Program Adapter`](src/gepa/adapters/dspy_full_program_adapter/) demonstrates this by evolving complete DSPy programs—including custom signatures, modules, and control flow logic. Starting from a basic `dspy.ChainOfThought("question -> answer")` that achieves 67% on the MATH benchmark, GEPA evolves a multi-step reasoning program that reach **93% accuracy**. A [fully executable example notebook](src/gepa/examples/dspy_full_program_evolution/example.ipynb) shows how to use this adapter.
+
 ### Using GEPA to optimize _your_ system
 
 GEPA can be used to optimize any system consisting of textual components. Follow these steps:
@@ -281,6 +283,7 @@ We encourage the community and users to help us develop adapters to allow GEPA t
   - [DSPy Adapter Code](https://github.com/stanfordnlp/dspy/tree/main/dspy/teleprompt/gepa/gepa_utils.py) (integrates GEPA with [DSPy](https://dspy.ai/)),  
   - [Contributed Adapters](src/gepa/adapters/) – see our adapter templates and issue tracker to request new integrations.
     - [DefaultAdapter](src/gepa/adapters/default_adapter/) - System Prompt Optimization for a single-turn task.
+    - [DSPy Full Program Adapter](src/gepa/adapters/dspy_full_program_adapter/) - Evolves entire DSPy programs including signatures, modules, and control flow. Achieves **93% accuracy** on MATH benchmark (vs 67% with basic DSPy ChainOfThought).
     - [TerminalBench Adapter](src/gepa/adapters/terminal_bench_adapter/) - Easily integrating GEPA into a Terminus, a sophisticated external agentic pipeline, and optimizing the agents' system prompt.
 
 ## Reference and Citation
