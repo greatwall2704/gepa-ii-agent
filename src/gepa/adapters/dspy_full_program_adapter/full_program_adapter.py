@@ -1,4 +1,3 @@
-import logging
 import random
 from typing import Any, Callable
 
@@ -9,22 +8,6 @@ from dspy.primitives import Example, Prediction
 from dspy.teleprompt.bootstrap_trace import TraceData
 
 from gepa import EvaluationBatch, GEPAAdapter
-
-
-class LoggerAdapter:
-    def __init__(self, logger: logging.Logger):
-        self.logger = logger
-
-    def log(self, x: str):
-        self.logger.info(x)
-
-
-DSPyTrace = list[tuple[Any, dict[str, Any], Prediction]]
-
-
-class ScoreWithFeedback(Prediction):
-    score: float
-    feedback: str
 
 
 class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
@@ -142,6 +125,8 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             return EvaluationBatch(outputs=outputs, scores=scores, trajectories=None)
 
     def make_reflective_dataset(self, candidate, eval_batch, components_to_update):
+        proposed_program, _ = self.build_program(candidate)
+
         assert set(components_to_update) == {"program"}, f"set(components_to_update) = {set(components_to_update)}"
         from dspy.teleprompt.bootstrap_trace import FailedPrediction
 
@@ -161,18 +146,17 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             prediction = data["prediction"]
             example_data["Program Outputs"] = {**prediction}
             module_score = data["score"]
-            if hasattr(module_score, "score"):
-                module_score = module_score["score"]
 
             if hasattr(module_score, "feedback"):
                 feedback_text = module_score["feedback"]
             else:
                 feedback_text = None
 
+            if hasattr(module_score, "score"):
+                module_score = module_score["score"]
+
             trace_instances = trace
 
-            if not self.add_format_failure_as_feedback:
-                trace_instances = [t for t in trace_instances if not isinstance(t[2], FailedPrediction)]
             if len(trace_instances) == 0:
                 continue
 
@@ -190,6 +174,13 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
             for selected in trace_instances:
                 inputs = selected[1]
                 outputs = selected[2]
+
+                pred_name = None
+                for name, predictor in proposed_program.named_predictors():
+                    if predictor.signature.equals(selected[0].signature):
+                        pred_name = name
+                        break
+                assert pred_name is not None, f"Could not find predictor for {selected[0].signature}"
 
                 new_inputs = {}
                 new_outputs = {}
@@ -224,7 +215,7 @@ class DspyAdapter(GEPAAdapter[Example, TraceData, Prediction]):
                     for output_key, output_val in outputs.items():
                         new_outputs[output_key] = str(output_val)
 
-                d = {"Inputs": new_inputs, "Generated Outputs": new_outputs}
+                d = {"Called Module": pred_name, "Inputs": new_inputs, "Generated Outputs": new_outputs}
                 # if isinstance(outputs, FailedPrediction):
                 #     adapter = ChatAdapter()
                 #     structure_instruction = ""
