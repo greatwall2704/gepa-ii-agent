@@ -62,7 +62,7 @@ python src/gepa/examples/anymaths-bench/train_anymaths.py --anymaths_dset_name .
 - `--budget`: The budget for the GEPA training (default is 500).
 - `--seed`: The seed for the random number generator for reproducibility (default is 0).
 
-#### 📓 Cookbook Training Runs
+#### 📓 Training command examples
 
 1. (Purely) **Using Ollama**:
     ```bash
@@ -86,17 +86,24 @@ Once the training has completed, you may replace the optimal prompt found in `sr
 ---
 
 ### 🔬 Model evaluation after GEPA training
-`src/gepa/examples/anymaths-bench/eval_default.py` is used to perform model evaluation on the test split. Feel free to modify this script to fit your custom evaluation scheme. Example: `"openai/gsm8k"` - `test`. The evaluation scores will be displayed in the terminal once the evaluation has been completed.
+`src/gepa/examples/anymaths-bench/eval_default.py` is used to perform model evaluation on the test split. Feel free to modify this script to fit your custom evaluation scheme. Example: `"openai/gsm8k"` - `test` is the dataset split used for benchmarking. The evaluation scores will be displayed in the terminal once the evaluation has been completed.
 
 How to run the evaluation script:
 1. **Using Ollama**:
     ```bash
-    python src/gepa/examples/anymaths-bench/eval_default.py --anymaths_dset_name "openai/gsm8k" --model "ollama/qwen3:4b" --use_api_url --api_url "http://localhost:11434" --batch_size 8 --max_litellm_workers 4
+    python src/gepa/examples/anymaths-bench/eval_default.py --anymaths_dset_name "openai/gsm8k" --model "ollama/qwen3:4b" --use_api_url --api_url "http://localhost:11434" --batch_size 8 --max_litellm_workers 4 --which_prompt "seed"
     ```
 2. **Use Google Vertex** for Gemini users:
     ```bash
-    python src/gepa/examples/anymaths-bench/eval_default.py --anymaths_dset_name "openai/gsm8k" --model "vertex_ai/gemini-2.5-flash-lite" --batch_size 8 --max_litellm_workers 4
+    python src/gepa/examples/anymaths-bench/eval_default.py --anymaths_dset_name "openai/gsm8k" --model "vertex_ai/gemini-2.5-flash-lite" --batch_size 8 --max_litellm_workers 4 --which_prompt "seed"
     ```
+- `--anymaths_dset_name`: The name of the AnyMaths dataset to use for evaluation (default is `"openai/gsm8k"`).
+- `--model`: The model to evaluate (default is `"ollama/qwen3:4b"`).
+- `--use_api_url`: Whether to use the API URL (default is `False`).
+- `--api_url`: The API URL to use (default is `"http://localhost:11434"`).
+- `--batch_size`: The batch size for evaluation (default is `8`).
+- `--max_litellm_workers`: The maximum number of LiteLLM workers to use (default is `4`).
+- `--which_prompt`: The prompt to use for evaluation (default is `"seed"`, choices are `"seed"` and `"optimized"`).
 
 **Note: The model that was used in GEPA training must also be the same model in performing model evaluation.**
 
@@ -107,6 +114,7 @@ How to run the evaluation script:
 | ------- | ------- | ------------- | ---------------------- | --------------------- | ------------ | ------ |
 | `"openai/gsm8k"` | `"ollama/qwen3:4b"` | `"ollama/qwen3:8b"` | 18 | 23 (**+5**) | 500 | 50-50-50 |
 | `"openai/gsm8k"` | `"vertex_ai/gemini-2.5-flash-lite"` | `"vertex_ai/gemini-2.5-flash"` | 31 | 33 (**+2**) | 500 | 50-50-50 |
+| `"openai/gsm8k"` | `"ollama/qwen3:0.6b"` | `"ollama/qwen3:8b"` | 7 | 5 (**-2**) | 500 | 50-50-50 |
 
 **Notice of WIP**: More tests will be done soon on other models (preferrably, small language models first).
 
@@ -218,7 +226,51 @@ How to run the evaluation script:
         *   The `final_answer` field must contain *only* the numerical value. Do not include any currency symbols (e.g., "$"), units (e.g., "dimes", "hours"), or any other descriptive text or explanation in this field. For example, if the answer is 4625 dollars, output `4625`. If the answer is 52 dimes, output `52`.
         *   Ensure the final answer numerically matches the result of your `solution_pad` calculations.'
     ```
+* Model: `"ollama/qwen3:0.6b"`, Dataset: `"openai/gsm8k"`, Budget: `500`:
+    ```
+    ### Instruction for Solving Math Word Problems
 
+    **Task Description:**
+    Solve multi-step math word problems by carefully analyzing the relationships between quantities, translating them into mathematical expressions, and performing accurate calculations. Ensure all components of the problem are addressed, and verify that percentages, fractions, and arithmetic operations are applied correctly.
+
+    **Key Requirements:**
+    1. **Parse Relationships:**
+    - Identify explicit and implicit relationships (e.g., "20 fewer than," "1/10 less," "10 more than").
+    - Define variables clearly (e.g., let Arts = x, then Maths = x - 20).
+
+    2. **Translate to Equations:**
+    - Convert word-based relationships into algebraic expressions or equations.
+    - For percentage changes, apply the correct formula (e.g., "1/10 less" means 90% of the original value).
+
+    3. **Account for All Components:**
+    - Ensure all subjects, quantities, or data points mentioned in the problem are included in the final calculation.
+    - Aggregate totals by summing individual values (e.g., total marks = sum of all subject scores).
+
+    4. **Verify Arithmetic and Logic:**
+    - Check for arithmetic errors (e.g., 1/10 of 70 = 7, not 70 - 7 = 63).
+    - Validate that the solution aligns with the problem’s constraints (e.g., no negative scores unless explicitly allowed).
+
+    5. **Document Step-by-Step Reasoning:**
+    - Break down the problem into logical steps, explicitly showing calculations (e.g., total birds = sum of daily totals).
+    - Use parentheses and order of operations to avoid errors (e.g., 5 sites × 7 birds/site = 35 birds).
+
+    6. **Final Answer Validation:**
+    - Ensure the final answer matches the problem’s question (e.g., total marks, average per site, or time difference).
+    - Recheck all steps to confirm consistency with the problem’s context.
+
+    **Example Application:**
+    For a problem like:
+    *"Amaya scored 20 fewer in Maths than Arts. She scored 10 more in Social Studies than Music. If she scored 70 in Music and 1/10 less in Maths, what is the total marks?"*
+    - Define variables: Arts = x, Maths = x - 20, Social Studies = 70 + 10 = 80.
+    - Calculate Maths: 1/10 less than Arts → Maths = x - 20 = 0.9x.
+    - Solve for x: x - 20 = 0.9x → x = 200 (Arts), Maths = 180.
+    - Total marks = 70 (Music) + 180 (Maths) + 200 (Arts) + 80 (Social Studies) = **296**.
+
+    **Error Prevention:**
+    - Avoid misinterpreting "1/10 less" as 1/10 of the value (instead, it means 90% of the original).
+    - Ensure all subjects are included (e.g., Music, Maths, Arts, Social Studies in the example).
+    - Double-check totals by summing individual components.
+    ```
 
 ---
 
@@ -234,6 +286,9 @@ How to run the evaluation script:
 - For provider models:
     * Fewer tokens: The prompt is more concise, using fewer tokens to convey the same information, which can lead to faster processing and lower costs.
     * Straightforward: Main instruction and output format are placed at the first parts of the prompt. Detailed guidelines are provided in a structured manner to facilitate understanding after the main instruction and output format.
+
+### ❓ Weird results and observations
+- In the case of `"ollama/qwen3:0.6b"`, the score did not improve as expected with additional context. Moreover, in the optimal prompt, the specific instruction to generate the expected JSON object was removed. In a similar fashion, we can also observe this omission in the optimal prompt for `"ollama/qwen3:4b"`.
 
 ---
 

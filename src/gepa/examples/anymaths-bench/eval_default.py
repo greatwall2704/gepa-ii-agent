@@ -19,6 +19,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_litellm_workers", type=int, default=1, help="The maximum number of LiteLLM workers to use."
     )
+    parser.add_argument(
+        "--which_prompt",
+        type=str,
+        default="seed",
+        choices=["seed", "optimized"],
+        help="The prompt to use for evaluation.",
+    )
 
     args = parser.parse_args()
 
@@ -35,7 +42,10 @@ if __name__ == "__main__":
 
     _, _, testset = init_dataset(dataset)
 
-    INSTRUCTION_PROMPT_PATH = Path(__file__).parent / "prompt-templates/optimal_prompt.txt"
+    if args.which_prompt == "seed":
+        INSTRUCTION_PROMPT_PATH = Path(__file__).parent / "prompt-templates/instruction_prompt.txt"
+    else:
+        INSTRUCTION_PROMPT_PATH = Path(__file__).parent / "prompt-templates/optimal_prompt.txt"
 
     instruction = INSTRUCTION_PROMPT_PATH.read_text()
 
@@ -52,6 +62,7 @@ if __name__ == "__main__":
     print(f"Using API URL: {api_url if api_url else 'No API URL'}")
     print(f"Batch size: {batch_size}")
     print(f"Max LiteLLM workers: {max_litellm_workers}")
+    print(f"Using prompt: {args.which_prompt}")
     print("-" * 100)
 
     with tqdm(total=len(testset), desc="Evaluating") as pbar:
