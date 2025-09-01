@@ -2,7 +2,7 @@
 # https://github.com/gepa-ai/gepa
 
 import random
-from typing import Any
+from typing import Any, Callable
 
 from gepa.adapters.default_adapter.default_adapter import DefaultAdapter
 from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
@@ -22,7 +22,7 @@ def optimize(
     trainset: list[DataInst],
     valset: list[DataInst] | None = None,
     adapter: GEPAAdapter[DataInst, Trajectory, RolloutOutput] | None = None,
-    task_lm: str | None = None,
+    task_lm: str | Callable | None = None,
     # Reflection-based configuration
     reflection_lm: LanguageModel | str | None = None,
     candidate_selection_strategy: str = "pareto",
