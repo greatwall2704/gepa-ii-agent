@@ -3,6 +3,17 @@
 
 ---
 
+### 📢 Auxiliary requirements
+Some auxiliary requirements for using the AnyMaths Adapter are found in `src/gepa/adapters/anymaths_adapter/requirements.txt`. Simply install the required packages listed in that file via:
+* If using `uv`:
+    ```bash
+    uv pip install -r src/gepa/adapters/anymaths_adapter/requirements.txt
+    ```
+* If using `pip`:
+    ```bash
+    pip install -r src/gepa/adapters/anymaths_adapter/requirements.txt
+    ```
+
 ### ✍️ Preparing the dataset
 In `src/gepa/examples/anymaths-bench/train_anymaths.py`, a sample function to prepare a dataset is provided via `init_dataset`. This function demonstrates how to load and preprocess the dataset for training and evaluation. Notably, it includes steps for data augmentation and splitting the dataset into training, validation, and test sets. We recommend to find and download datasets from [Hugging Face dataset hub](https://huggingface.co/datasets).
 
