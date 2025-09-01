@@ -2,7 +2,7 @@
 # https://github.com/gepa-ai/gepa
 
 import random
-from typing import Any
+from typing import Any, Callable
 
 from gepa.adapters.default_adapter.default_adapter import DefaultAdapter
 from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
