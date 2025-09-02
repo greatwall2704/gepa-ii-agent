@@ -127,7 +127,7 @@ def optimize(
 
     if not hasattr(adapter, "propose_new_texts"):
         assert reflection_lm is not None, (
-            f"reflection_lm was not provided. The adapter used '{str(adapter)}' does not provide a propose_new_texts method, " + \
+            f"reflection_lm was not provided. The adapter used '{adapter!s}' does not provide a propose_new_texts method, " + \
             "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
         )
 
