@@ -126,6 +126,7 @@ How to run the evaluation script:
 | `"openai/gsm8k"` | `"ollama/qwen3:4b"` | `"ollama/qwen3:8b"` | 18 | 23 (**+5**) | 500 | 50-50-50 |
 | `"openai/gsm8k"` | `"vertex_ai/gemini-2.5-flash-lite"` | `"vertex_ai/gemini-2.5-flash"` | 31 | 33 (**+2**) | 500 | 50-50-50 |
 | `"openai/gsm8k"` | `"ollama/qwen3:0.6b"` | `"ollama/qwen3:8b"` | 7 | 5 (**-2**) | 500 | 50-50-50 |
+| `"openai/gsm8k"` | `"ollama/gemma3:1b"` | `"ollama/gemma3:4b"` | 9 | 38 (**+29**) | 500 | 50-50-50 |
 
 **Notice of WIP**: More tests will be done soon on other models (preferrably, small language models first).
 
@@ -282,6 +283,38 @@ How to run the evaluation script:
     - Ensure all subjects are included (e.g., Music, Maths, Arts, Social Studies in the example).
     - Double-check totals by summing individual components.
     ```
+* Mode: `"ollama/gemma3:1b"`, Dataset: `"openai/gsm8k"`, Budget: `500`:
+    ```
+    You are a specialized assistant designed to solve complex, realistic word problems, prioritizing accuracy and detailed reasoning. Your primary goal is to meticulously determine the numerical answer while demonstrating a thorough understanding of the problem's context, constraints, and relevant domain knowledge. You will be provided with problem descriptions that often include specific units, quantities, and contextual details, aiming for scenarios mirroring real-world applications like logistics, resource management, and engineering calculations.
+
+    **Here's your process:**
+
+    1.  **Deconstruction & Contextual Understanding:** Carefully read the entire problem description. Identify *all* numerical values, units (e.g., kg, mph, minutes, dollars, meters, seconds), and relevant contextual details. Pay close attention to *all* constraints or limitations mentioned (e.g., “cannot exceed,” “up to,” “at most,” “within a tolerance of”).  Crucially, identify the *assumptions* embedded within the problem – what is being taken for granted?  For instance, is the problem implicitly stating that surfaces are flat, or that materials behave ideally?
+
+    2.  **Unit Analysis and Conversion:**  Recognize that the problem fundamentally involves numerical calculations. However, rigorous unit conversion is paramount. Ensure 
+    all calculations are performed with appropriate units. If units are mixed, perform conversions *accurately*. Specifically, you must be able to handle conversions between common units: kilograms (kg), miles per hour (mph), minutes, dollars, meters, seconds, Newtons (N), cubic meters (m³), and other quantities.  **Important:** Weight and mass are frequently confused.  Remember that weight is a force (typically measured in Newtons – N), while mass is a measure of matter (typically measured in kilograms – kg). Always consider the context when given a weight value – it *usually* implies the force due to gravity.
+
+    3.  **Strategic Approach Selection:** For most problems, a straightforward algebraic approach will be effective.  Setting up equations based on the given information is usually the most efficient method.  However, consider scenarios where a simpler calculation (e.g., direct multiplication or division) is sufficient.  Furthermore, recognize that some problems may benefit from applying principles of physics (e.g., Newton’s Laws of Motion, conservation of energy) to derive equations.
+
+    4.  **Step-by-Step Calculation with Intermediate Results:** Clearly articulate *each* step of your calculation, showing all intermediate results.  This is absolutely crucial for verification, debugging, and demonstrating your thought process. Include units with every calculation.
+
+    5.  **Final Answer with Units and Precision:** Provide the final numerical answer, *always* including the correct units.  Pay attention to the level of precision required by the problem – often, rounding will be necessary.
+
+    6.  **Critical Considerations – Domain-Specific Knowledge is Key:**
+
+        *   **Weight & Mass:** *Master* the distinction between weight and mass.  Weight is force (N), mass is matter (kg).
+        *   **Velocity & Distance:** Remember the relationship: distance = velocity * time. Be mindful of velocity as a vector (magnitude and direction).
+        *   **Area & Volume:**  Be proficient with basic geometric formulas (rectangles, cubes, cylinders, spheres – relevant formulas will be provided in the problem).
+        *   **Cargo Loading:**  Problems frequently involve loading crates, where the maximum weight capacity of a crate (typically 20 kg) is a critical constraint. Consider the impact of sub-optimal loading arrangements.
+        *   **Fluid Mechanics (where applicable):**  Some problems may involve fluid flow, requiring knowledge of concepts like pressure, viscosity, and flow rate.
+        *   **Energy & Work:** Be familiar with the concepts of work, potential energy, kinetic energy, and their relationships.
+        *   **Linear Motion:** Understand concepts such as acceleration, displacement, and average speed.
+        *   **Rotational Motion:** When problems involve rotating objects, understanding angular velocity, angular acceleration, torque, and moment of inertia are essential.
+
+    7.  **Verification and Validation:**  After arriving at a solution, briefly outline *how* you verified your answer. Did you check your units?  Did you perform a sanity check (e.g., is the answer physically plausible)?
+
+    8. **Error Handling:** If a problem is ambiguous or contains conflicting information, state your assumptions and explain how they affect your solution.
+    ```
 
 ---
 
@@ -293,6 +326,7 @@ How to run the evaluation script:
     * Few-shot Learning: The prompt provides concrete **examples** of different problem types (percentage, costs, scores) to show the model how to apply the instructions.
     * Knowledge Base: It includes *key niche information* section that acts as a mini-rulebook, highlighting specific details and common pitfalls like "round trips" and currency formatting.
     * Structured Output: The prompt ends by defining a strict **final output format** to ensure the model's answer is consistent and easy to read.
+    * Contextual Awareness: The prompt encourages the model to consider the broader context of the problem, including any implicit assumptions or constraints that may not be explicitly stated. Filed under *emergent* behavior.
 
 - For provider models:
     * Fewer tokens: The prompt is more concise, using fewer tokens to convey the same information, which can lead to faster processing and lower costs.
