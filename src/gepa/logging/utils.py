@@ -12,6 +12,7 @@ def log_detailed_metrics_after_discovering_new_program(
     valset_score,
     new_program_idx,
     valset_subscores,
+    use_wandb,
     use_mlflow,
     linear_pareto_front_program_idx,
 ):
@@ -48,7 +49,7 @@ def log_detailed_metrics_after_discovering_new_program(
     logger.log(f"Iteration {gepa_state.i + 1}: Linear pareto front program index: {linear_pareto_front_program_idx}")
     logger.log(f"Iteration {gepa_state.i + 1}: New program candidate index: {new_program_idx}")
 
-    mlflow_logs = {
+    metrics = {
         "iteration": gepa_state.i + 1,
         # "full_valset_score": valset_score,
         # "full_train_val_score": gepa_state.per_program_tracked_scores[new_program_idx],
@@ -65,7 +66,9 @@ def log_detailed_metrics_after_discovering_new_program(
         "best_score_on_train_val": gepa_state.per_program_tracked_scores[best_prog_as_per_agg_score],
     }
 
-    if use_mlflow:
+    if use_wandb:
+        import wandb  # type: ignore
+        wandb.log(metrics, step=gepa_state.i + 1)
+    elif use_mlflow:
         import mlflow  # type: ignore
-
-        mlflow.log_metrics(mlflow_logs, step=gepa_state.i + 1)
+        mlflow.log_metrics(metrics, step=gepa_state.i + 1)

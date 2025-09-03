@@ -37,7 +37,10 @@ def optimize(
     # Logging
     logger: LoggerProtocol | None = None,
     run_dir: str | None = None,
+    use_wandb: bool = False,
     use_mlflow: bool = False,
+    wandb_api_key: str | None = None,
+    wandb_init_kwargs: dict[str, Any] | None = None,
     mlflow_tracking_uri: str | None = None,
     mlflow_experiment_name: str | None = None,
     track_best_outputs: bool = False,
@@ -107,7 +110,10 @@ def optimize(
     # Logging
     - logger: A `LoggerProtocol` instance that is used to log the progress of the optimization.
     - run_dir: The directory to save the results to.
+    - use_wandb: Whether to use Weights and Biases to log the progress of the optimization.
     - use_mlflow: Whether to use MLflow to log the progress of the optimization.
+    - wandb_api_key: The API key to use for Weights and Biases.
+    - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
     - mlflow_tracking_uri: The tracking URI to use for MLflow.
     - mlflow_experiment_name: The experiment name to use for MLflow.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
@@ -165,6 +171,7 @@ def optimize(
         batch_sampler=batch_sampler,
         perfect_score=perfect_score,
         skip_perfect_score=skip_perfect_score,
+        use_wandb=use_wandb,
         use_mlflow=use_mlflow,
         reflection_lm=reflection_lm,
     )
@@ -195,7 +202,10 @@ def optimize(
         reflective_proposer=reflective_proposer,
         merge_proposer=merge_proposer,
         logger=logger,
+        use_wandb=use_wandb,
         use_mlflow=use_mlflow,
+        wandb_api_key=wandb_api_key,
+        wandb_init_kwargs=wandb_init_kwargs,
         mlflow_tracking_uri=mlflow_tracking_uri,
         mlflow_experiment_name=mlflow_experiment_name,
         track_best_outputs=track_best_outputs,

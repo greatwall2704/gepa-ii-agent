@@ -136,7 +136,7 @@ One thing to be very careful about is handling interactive sessions like less, v
         valset=valset,
         adapter=adapter,
         reflection_lm=reflection_lm,
-        use_mlflow=True,
+        use_wandb=True,
         max_metric_calls=400,
         reflection_minibatch_size=3,
         perfect_score=1,
