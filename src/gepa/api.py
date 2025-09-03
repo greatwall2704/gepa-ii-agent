@@ -37,14 +37,15 @@ def optimize(
     # Logging
     logger: LoggerProtocol | None = None,
     run_dir: str | None = None,
-    use_wandb: bool = False,
-    wandb_api_key: str | None = None,
-    wandb_init_kwargs: dict[str, Any] | None = None,
+    use_mlflow: bool = False,
+    mlflow_tracking_uri: str | None = None,
     track_best_outputs: bool = False,
     display_progress_bar: bool = False,
     # Reproducibility
     seed: int = 0,
     raise_on_exception: bool = True,
+    # for backwards compatibility
+    **kwargs: Any,
 ):
     """
     GEPA is an evolutionary optimizer that evolves (multiple) text components of a complex system to optimize them towards a given metric.
@@ -105,9 +106,8 @@ def optimize(
     # Logging
     - logger: A `LoggerProtocol` instance that is used to log the progress of the optimization.
     - run_dir: The directory to save the results to.
-    - use_wandb: Whether to use Weights and Biases to log the progress of the optimization.
-    - wandb_api_key: The API key to use for Weights and Biases.
-    - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
+    - use_mlflow: Whether to use MLflow to log the progress of the optimization.
+    - mlflow_tracking_uri: The tracking URI to use for MLflow.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
 
     # Reproducibility
@@ -127,8 +127,8 @@ def optimize(
 
     if not hasattr(adapter, "propose_new_texts"):
         assert reflection_lm is not None, (
-            f"reflection_lm was not provided. The adapter used '{adapter!s}' does not provide a propose_new_texts method, " + \
-            "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
+            f"reflection_lm was not provided. The adapter used '{adapter!s}' does not provide a propose_new_texts method, "
+            + "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
         )
 
     if isinstance(reflection_lm, str):
@@ -163,7 +163,7 @@ def optimize(
         batch_sampler=batch_sampler,
         perfect_score=perfect_score,
         skip_perfect_score=skip_perfect_score,
-        use_wandb=use_wandb,
+        use_mlflow=use_mlflow,
         reflection_lm=reflection_lm,
     )
 
@@ -193,9 +193,8 @@ def optimize(
         reflective_proposer=reflective_proposer,
         merge_proposer=merge_proposer,
         logger=logger,
-        use_wandb=use_wandb,
-        wandb_api_key=wandb_api_key,
-        wandb_init_kwargs=wandb_init_kwargs,
+        use_mlflow=use_mlflow,
+        mlflow_tracking_uri=mlflow_tracking_uri,
         track_best_outputs=track_best_outputs,
         display_progress_bar=display_progress_bar,
         raise_on_exception=raise_on_exception,

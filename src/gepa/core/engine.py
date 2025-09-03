@@ -5,8 +5,8 @@ import traceback
 from typing import Any, Callable, Generic
 
 from gepa.core.state import GEPAState, initialize_gepa_state
+from gepa.logging.mlflow_utils import initialize_mlflow
 from gepa.logging.utils import log_detailed_metrics_after_discovering_new_program
-from gepa.logging.wandb_utils import initialize_wandb
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
 
@@ -39,9 +39,9 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         merge_proposer: MergeProposer | None,
         # Logging
         logger: Any,
-        use_wandb: bool = False,
-        wandb_api_key: str | None = None,
-        wandb_init_kwargs: dict[str, Any] | None = None,
+        use_mlflow: bool = False,
+        mlflow_tracking_uri: str | None = None,
+        mlflow_experiment_name: str | None = None,
         track_best_outputs: bool = False,
         display_progress_bar: bool = False,
         raise_on_exception: bool = True,
@@ -58,10 +58,10 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         self.max_metric_calls = max_metric_calls
 
         self.perfect_score = perfect_score
-        self.use_wandb = use_wandb
-        self.wandb_api_key = wandb_api_key
+        self.use_mlflow = use_mlflow
+        self.mlflow_tracking_uri = mlflow_tracking_uri
+        self.mlflow_experiment_name = mlflow_experiment_name
         self.seed = seed
-        self.wandb_init_kwargs = wandb_init_kwargs or {}
 
         self.reflective_proposer = reflective_proposer
         self.merge_proposer = merge_proposer
@@ -117,14 +117,17 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             new_program_idx=new_program_idx,
             valset_subscores=valset_subscores,
             # new_instruction="Merged or Reflective program",
-            use_wandb=self.use_wandb,
+            use_mlflow=self.use_mlflow,
             linear_pareto_front_program_idx=linear_pareto_front_program_idx,
         )
         return new_program_idx, linear_pareto_front_program_idx
 
     def run(self) -> GEPAState:
-        if self.use_wandb:
-            initialize_wandb(wandb_api_key=self.wandb_api_key, wandb_init_kwargs=self.wandb_init_kwargs)
+        if self.use_mlflow:
+            initialize_mlflow(
+                mlflow_tracking_uri=self.mlflow_tracking_uri, mlflow_experiment_name=self.mlflow_experiment_name
+            )
+            mlflow.start_run(nested=True)  # in case of nested runs
 
         # Check tqdm availability if progress bar is enabled
         progress_bar = None
@@ -151,14 +154,15 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
         assert len(state.pareto_front_valset) == len(self.valset)
 
-        if self.use_wandb:
-            import wandb  # type: ignore
+        if self.use_mlflow:
+            import mlflow  # type: ignore
 
-            wandb.log(
+            mlflow.log_metrics(
                 {
                     "base_program_full_valset_score": state.program_full_scores_val_set[0],
                     "iteration": state.i + 1,
-                }
+                },
+                step=state.i + 1,
             )
 
         self.logger.log(
@@ -250,6 +254,9 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         # Close progress bar if it exists
         if self.display_progress_bar:
             progress_bar.close()
+
+        if self.use_mlflow and mlflow.active_run() is not None:
+            mlflow.end_run()
 
         state.save(self.run_dir)
         return state

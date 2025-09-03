@@ -166,7 +166,7 @@ if __name__ == "__main__":
         reflection_minibatch_size=reflection_minibatch_size,
         perfect_score=1,
         skip_perfect_score=False,
-        use_wandb=False,
+        use_mlflow=False,
         max_metric_calls=budget,
         seed=seed,
         display_progress_bar=True,
