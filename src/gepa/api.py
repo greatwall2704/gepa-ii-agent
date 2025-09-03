@@ -10,7 +10,7 @@ from gepa.core.engine import GEPAEngine
 from gepa.core.result import GEPAResult
 from gepa.logging.logger import LoggerProtocol, StdOutLogger
 from gepa.proposer.merge import MergeProposer
-from gepa.proposer.reflective_mutation.base import LanguageModel
+from gepa.proposer.reflective_mutation.base import LanguageModel, ReflectionComponentSelector
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
 from gepa.strategies.batch_sampler import EpochShuffledBatchSampler
 from gepa.strategies.candidate_selector import CurrentBestCandidateSelector, ParetoCandidateSelector
@@ -29,6 +29,8 @@ def optimize(
     skip_perfect_score=True,
     reflection_minibatch_size=3,
     perfect_score=1,
+    # Component selection configuration
+    module_selector: "ReflectionComponentSelector | None" = None,
     # Merge-based configuration
     use_merge=False,
     max_merge_invocations=5,
@@ -95,6 +97,9 @@ def optimize(
     - reflection_minibatch_size: The number of examples to use for reflection in each proposal step.
     - perfect_score: The perfect score to achieve.
 
+    # Component selection configuration
+    - module_selector: Optional ReflectionComponentSelector to control which components are selected for updates. If None, uses RoundRobinReflectionComponentSelector (default behavior).
+
     # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
     - max_merge_invocations: The maximum number of merge invocations to perform.
@@ -151,7 +156,7 @@ def optimize(
     candidate_selector = (
         ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
     )
-    module_selector = RoundRobinReflectionComponentSelector()
+    module_selector = module_selector or RoundRobinReflectionComponentSelector()
     batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size, rng=rng)
 
     reflective_proposer = ReflectiveMutationProposer(
