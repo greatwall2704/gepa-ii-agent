@@ -39,6 +39,7 @@ def optimize(
     run_dir: str | None = None,
     use_mlflow: bool = False,
     mlflow_tracking_uri: str | None = None,
+    mlflow_experiment_name: str | None = None,
     track_best_outputs: bool = False,
     display_progress_bar: bool = False,
     # Reproducibility
@@ -108,6 +109,7 @@ def optimize(
     - run_dir: The directory to save the results to.
     - use_mlflow: Whether to use MLflow to log the progress of the optimization.
     - mlflow_tracking_uri: The tracking URI to use for MLflow.
+    - mlflow_experiment_name: The experiment name to use for MLflow.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
 
     # Reproducibility
@@ -195,6 +197,7 @@ def optimize(
         logger=logger,
         use_mlflow=use_mlflow,
         mlflow_tracking_uri=mlflow_tracking_uri,
+        mlflow_experiment_name=mlflow_experiment_name,
         track_best_outputs=track_best_outputs,
         display_progress_bar=display_progress_bar,
         raise_on_exception=raise_on_exception,
