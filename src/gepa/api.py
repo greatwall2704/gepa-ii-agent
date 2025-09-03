@@ -124,9 +124,12 @@ def optimize(
         )
 
     assert max_metric_calls is not None, "max_metric_calls must be set"
-    assert reflection_lm is not None, (
-        "GEPA currently requires a reflection LM to be provided. We will soon support simpler application without specifying a reflection LM."
-    )
+
+    if not hasattr(adapter, "propose_new_texts"):
+        assert reflection_lm is not None, (
+            f"reflection_lm was not provided. The adapter used '{adapter!s}' does not provide a propose_new_texts method, " + \
+            "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
+        )
 
     if isinstance(reflection_lm, str):
         import litellm
