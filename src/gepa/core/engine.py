@@ -40,9 +40,9 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         # Logging
         logger: Any,
         use_wandb: bool = False,
-        use_mlflow: bool = False,
         wandb_api_key: str | None = None,
         wandb_init_kwargs: dict[str, Any] | None = None,
+        use_mlflow: bool = False,
         mlflow_tracking_uri: str | None = None,
         mlflow_experiment_name: str | None = None,
         track_best_outputs: bool = False,
@@ -62,9 +62,9 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
 
         self.perfect_score = perfect_score
         self.use_wandb = use_wandb
-        self.use_mlflow = use_mlflow
         self.wandb_api_key = wandb_api_key
         self.wandb_init_kwargs = wandb_init_kwargs or {}
+        self.use_mlflow = use_mlflow
         self.mlflow_tracking_uri = mlflow_tracking_uri
         self.mlflow_experiment_name = mlflow_experiment_name
         self.seed = seed
@@ -72,9 +72,9 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         # Create experiment tracker
         self.experiment_tracker = create_experiment_tracker(
             use_wandb=use_wandb,
-            use_mlflow=use_mlflow,
             wandb_api_key=wandb_api_key,
             wandb_init_kwargs=wandb_init_kwargs,
+            use_mlflow=use_mlflow,
             mlflow_tracking_uri=mlflow_tracking_uri,
             mlflow_experiment_name=mlflow_experiment_name,
         )

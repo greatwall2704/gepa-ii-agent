@@ -23,9 +23,9 @@ class ExperimentTracker:
     def __init__(
         self,
         use_wandb: bool = False,
-        use_mlflow: bool = False,
         wandb_api_key: str | None = None,
         wandb_init_kwargs: dict[str, Any] | None = None,
+        use_mlflow: bool = False,
         mlflow_tracking_uri: str | None = None,
         mlflow_experiment_name: str | None = None,
     ):
@@ -121,9 +121,9 @@ class ExperimentTracker:
 
 def create_experiment_tracker(
     use_wandb: bool = False,
-    use_mlflow: bool = False,
     wandb_api_key: str | None = None,
     wandb_init_kwargs: dict[str, Any] | None = None,
+    use_mlflow: bool = False,
     mlflow_tracking_uri: str | None = None,
     mlflow_experiment_name: str | None = None,
 ) -> ExperimentTracker:
@@ -146,9 +146,9 @@ def create_experiment_tracker(
     """
     return ExperimentTracker(
         use_wandb=use_wandb,
-        use_mlflow=use_mlflow,
         wandb_api_key=wandb_api_key,
         wandb_init_kwargs=wandb_init_kwargs,
+        use_mlflow=use_mlflow,
         mlflow_tracking_uri=mlflow_tracking_uri,
         mlflow_experiment_name=mlflow_experiment_name,
     )
