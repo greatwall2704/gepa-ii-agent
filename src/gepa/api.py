@@ -30,7 +30,7 @@ def optimize(
     reflection_minibatch_size=3,
     perfect_score=1,
     # Component selection configuration
-    module_selector: "ReflectionComponentSelector | None" = None,
+    module_selector: "ReflectionComponentSelector | str | None" = None,
     # Merge-based configuration
     use_merge=False,
     max_merge_invocations=5,
@@ -98,7 +98,7 @@ def optimize(
     - perfect_score: The perfect score to achieve.
 
     # Component selection configuration
-    - module_selector: Optional ReflectionComponentSelector to control which components are selected for updates. If None, uses RoundRobinReflectionComponentSelector (default behavior).
+    - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance, a string ('round_robin'), or None. If None, defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order.
 
     # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
@@ -156,7 +156,20 @@ def optimize(
     candidate_selector = (
         ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
     )
-    module_selector = module_selector or RoundRobinReflectionComponentSelector()
+
+    module_selector = module_selector or "round_robin"
+
+    if isinstance(module_selector, str):
+        module_selector_cls = {
+            "round_robin": RoundRobinReflectionComponentSelector,
+        }.get(module_selector)
+
+        assert module_selector_cls is not None, (
+            f"Unknown module_selector strategy: {module_selector}. Supported strategies: 'round_robin'"
+        )
+
+        module_selector = module_selector_cls()
+
     batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size, rng=rng)
 
     reflective_proposer = ReflectiveMutationProposer(
