@@ -38,9 +38,9 @@ def optimize(
     logger: LoggerProtocol | None = None,
     run_dir: str | None = None,
     use_wandb: bool = False,
-    use_mlflow: bool = False,
     wandb_api_key: str | None = None,
     wandb_init_kwargs: dict[str, Any] | None = None,
+    use_mlflow: bool = False,
     mlflow_tracking_uri: str | None = None,
     mlflow_experiment_name: str | None = None,
     track_best_outputs: bool = False,
@@ -109,9 +109,10 @@ def optimize(
     - logger: A `LoggerProtocol` instance that is used to log the progress of the optimization.
     - run_dir: The directory to save the results to.
     - use_wandb: Whether to use Weights and Biases to log the progress of the optimization.
-    - use_mlflow: Whether to use MLflow to log the progress of the optimization.
     - wandb_api_key: The API key to use for Weights and Biases.
     - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
+    - use_mlflow: Whether to use MLflow to log the progress of the optimization.
+      Both wandb and mlflow can be used simultaneously if desired.
     - mlflow_tracking_uri: The tracking URI to use for MLflow.
     - mlflow_experiment_name: The experiment name to use for MLflow.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
@@ -210,6 +211,10 @@ def optimize(
         display_progress_bar=display_progress_bar,
         raise_on_exception=raise_on_exception,
     )
-    state = engine.run()
+
+    # Use context manager for proper resource cleanup
+    with engine:
+        state = engine._run_optimization()
+
     result = GEPAResult.from_state(state)
     return result

@@ -68,7 +68,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         self.mlflow_tracking_uri = mlflow_tracking_uri
         self.mlflow_experiment_name = mlflow_experiment_name
         self.seed = seed
-        
+
         # Create experiment tracker
         self.experiment_tracker = create_experiment_tracker(
             use_wandb=use_wandb,
@@ -140,10 +140,12 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         return new_program_idx, linear_pareto_front_program_idx
 
     def run(self) -> GEPAState:
-        # Initialize experiment tracking
-        self.experiment_tracker.initialize()
-        self.experiment_tracker.start_run(nested=True)
+        """Run the optimization with automatic experiment tracking setup."""
+        with self.experiment_tracker:
+            return self._run_optimization()
 
+    def _run_optimization(self) -> GEPAState:
+        """Internal method that runs the optimization without experiment tracking setup."""
         # Check tqdm availability if progress bar is enabled
         progress_bar = None
         if self.display_progress_bar:
@@ -267,9 +269,6 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         # Close progress bar if it exists
         if self.display_progress_bar:
             progress_bar.close()
-
-        # End experiment tracking
-        self.experiment_tracker.end_run()
 
         state.save(self.run_dir)
         return state
