@@ -302,3 +302,5 @@ If you use this repository, or the GEPA algorithm, kindly cite:
       url={https://arxiv.org/abs/2507.19457}, 
 }
 ```
+
+[![Star History Chart](https://api.star-history.com/svg?repos=gepa-ai/gepa&type=Date)](https://www.star-history.com/#gepa-ai/gepa&Date)
