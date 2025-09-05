@@ -7,11 +7,10 @@ from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
 from gepa.strategies.component_selector import RoundRobinReflectionComponentSelector
 
 
-@patch("gepa.api.GEPAEngine.run")
-@patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_none_defaults_to_round_robin(mock_proposer, mock_run):
-    """Test that module_selector=None defaults to round robin."""
-    mock_run.return_value = Mock(
+@pytest.fixture
+def common_mocks():
+    """Common mock setup for all module selector tests."""
+    mock_run_return = Mock(
         program_candidates=[{"test": "value"}],
         parent_program_for_candidate=[None],
         program_full_scores_val_set=[0.5],
@@ -22,6 +21,16 @@ def test_module_selector_none_defaults_to_round_robin(mock_proposer, mock_run):
 
     mock_adapter = Mock()
     mock_adapter.evaluate.return_value = Mock(outputs=[], scores=[])
+
+    return mock_run_return, mock_adapter
+
+
+@patch("gepa.api.GEPAEngine.run")
+@patch("gepa.api.ReflectiveMutationProposer")
+def test_module_selector_none_defaults_to_round_robin(mock_proposer, mock_run, common_mocks):
+    """Test that module_selector=None defaults to round robin."""
+    mock_run_return, mock_adapter = common_mocks
+    mock_run.return_value = mock_run_return
 
     result = optimize(
         seed_candidate={"test": "value"},
@@ -42,19 +51,10 @@ def test_module_selector_none_defaults_to_round_robin(mock_proposer, mock_run):
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_string_round_robin(mock_proposer, mock_run):
+def test_module_selector_string_round_robin(mock_proposer, mock_run, common_mocks):
     """Test that module_selector='round_robin' works with optimize()."""
-    mock_run.return_value = Mock(
-        program_candidates=[{"test": "value"}],
-        parent_program_for_candidate=[None],
-        program_full_scores_val_set=[0.5],
-        prog_candidate_val_subscores=[[]],
-        program_at_pareto_front_valset=[set()],
-        num_metric_calls_by_discovery=[1],
-    )
-
-    mock_adapter = Mock()
-    mock_adapter.evaluate.return_value = Mock(outputs=[], scores=[])
+    mock_run_return, mock_adapter = common_mocks
+    mock_run.return_value = mock_run_return
 
     result = optimize(
         seed_candidate={"test": "value"},
@@ -75,19 +75,10 @@ def test_module_selector_string_round_robin(mock_proposer, mock_run):
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_custom_instance(mock_proposer, mock_run):
+def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
     """Test that module_selector accepts custom instances with optimize()."""
-    mock_run.return_value = Mock(
-        program_candidates=[{"test": "value"}],
-        parent_program_for_candidate=[None],
-        program_full_scores_val_set=[0.5],
-        prog_candidate_val_subscores=[[]],
-        program_at_pareto_front_valset=[set()],
-        num_metric_calls_by_discovery=[1],
-    )
-
-    mock_adapter = Mock()
-    mock_adapter.evaluate.return_value = Mock(outputs=[], scores=[])
+    mock_run_return, mock_adapter = common_mocks
+    mock_run.return_value = mock_run_return
 
     class CustomComponentSelector(ReflectionComponentSelector):
         def select_modules(self, state, trajectories, subsample_scores, candidate_idx, candidate):
@@ -112,10 +103,9 @@ def test_module_selector_custom_instance(mock_proposer, mock_run):
     assert result is not None
 
 
-def test_module_selector_invalid_string_raises_error():
+def test_module_selector_invalid_string_raises_error(common_mocks):
     """Test that invalid module_selector string raises AssertionError."""
-    mock_adapter = Mock()
-    mock_adapter.evaluate.return_value = Mock(outputs=[], scores=[])
+    _, mock_adapter = common_mocks
 
     with pytest.raises(AssertionError, match="Unknown module_selector strategy"):
         optimize(
