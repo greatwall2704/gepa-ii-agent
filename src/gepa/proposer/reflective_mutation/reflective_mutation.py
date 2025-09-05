@@ -36,8 +36,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         batch_sampler: BatchSampler,
         perfect_score: float,
         skip_perfect_score: bool,
-        use_wandb: bool,
-        use_mlflow: bool,
+        experiment_tracker: Any,
         reflection_lm: LanguageModel | None = None,
     ):
         self.logger = logger
@@ -48,8 +47,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         self.batch_sampler = batch_sampler
         self.perfect_score = perfect_score
         self.skip_perfect_score = skip_perfect_score
-        self.use_wandb = use_wandb
-        self.use_mlflow = use_mlflow
+        self.experiment_tracker = experiment_tracker
         self.reflection_lm = reflection_lm
 
     def propose_new_texts(
@@ -86,12 +84,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
             f"Iteration {i}: Selected program {curr_prog_id} score: {state.per_program_tracked_scores[curr_prog_id]}"
         )
 
-        if self.use_wandb:
-            import wandb  # type: ignore
-            wandb.log({"iteration": i, "selected_program_candidate": curr_prog_id}, step=i)
-        elif self.use_mlflow:
-            import mlflow  # type: ignore
-            mlflow.log_metrics({"iteration": i, "selected_program_candidate": curr_prog_id}, step=i)
+        self.experiment_tracker.log_metrics({"iteration": i, "selected_program_candidate": curr_prog_id}, step=i)
 
         subsample_ids = self.batch_sampler.next_minibatch_indices(len(self.trainset), i - 1)
         state.full_program_trace[-1]["subsample_ids"] = subsample_ids
@@ -110,12 +103,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
             self.logger.log(f"Iteration {i}: All subsample scores perfect. Skipping.")
             return None
 
-        if self.use_wandb:
-            import wandb  # type: ignore
-            wandb.log({"subsample_score": sum(eval_curr.scores)}, step=i)
-        elif self.use_mlflow:
-            import mlflow  # type: ignore
-            mlflow.log_metrics({"subsample_score": sum(eval_curr.scores)}, step=i)
+        self.experiment_tracker.log_metrics({"subsample_score": sum(eval_curr.scores)}, step=i)
 
         # 2) Decide which predictors to update
         predictor_names_to_update = self.module_selector.select_modules(
@@ -128,12 +116,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
             new_texts = self.propose_new_texts(curr_prog, reflective_dataset, predictor_names_to_update)
             for pname, text in new_texts.items():
                 self.logger.log(f"Iteration {i}: Proposed new text for {pname}: {text}")
-            if self.use_wandb:
-                import wandb  # type: ignore
-                wandb.log({f"new_instruction_{pname}": text for pname, text in new_texts.items()}, step=i)
-            elif self.use_mlflow:
-                import mlflow  # type: ignore
-                mlflow.log_metrics({f"new_instruction_{pname}": text for pname, text in new_texts.items()}, step=i)
+            self.experiment_tracker.log_metrics({f"new_instruction_{pname}": text for pname, text in new_texts.items()}, step=i)
         except Exception as e:
             self.logger.log(f"Iteration {i}: Exception during reflection/proposal: {e}")
             import traceback
@@ -152,12 +135,7 @@ class ReflectiveMutationProposer(ProposeNewCandidate):
         state.full_program_trace[-1]["new_subsample_scores"] = eval_new.scores
 
         new_sum = sum(eval_new.scores)
-        if self.use_wandb:
-            import wandb  # type: ignore
-            wandb.log({"new_subsample_score": new_sum}, step=i)
-        elif self.use_mlflow:
-            import mlflow  # type: ignore
-            mlflow.log_metrics({"new_subsample_score": new_sum}, step=i)
+        self.experiment_tracker.log_metrics({"new_subsample_score": new_sum}, step=i)
 
         return CandidateProposal(
             candidate=new_candidate,

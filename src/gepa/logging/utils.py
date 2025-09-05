@@ -12,8 +12,7 @@ def log_detailed_metrics_after_discovering_new_program(
     valset_score,
     new_program_idx,
     valset_subscores,
-    use_wandb,
-    use_mlflow,
+    experiment_tracker,
     linear_pareto_front_program_idx,
 ):
     best_prog_as_per_agg_score = idxmax(gepa_state.per_program_tracked_scores)
@@ -66,9 +65,4 @@ def log_detailed_metrics_after_discovering_new_program(
         "best_score_on_train_val": gepa_state.per_program_tracked_scores[best_prog_as_per_agg_score],
     }
 
-    if use_wandb:
-        import wandb  # type: ignore
-        wandb.log(metrics, step=gepa_state.i + 1)
-    elif use_mlflow:
-        import mlflow  # type: ignore
-        mlflow.log_metrics(metrics, step=gepa_state.i + 1)
+    experiment_tracker.log_metrics(metrics, step=gepa_state.i + 1)

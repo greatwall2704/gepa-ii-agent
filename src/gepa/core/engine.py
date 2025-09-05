@@ -5,7 +5,6 @@ import traceback
 from typing import Any, Callable, Generic
 
 from gepa.core.state import GEPAState, initialize_gepa_state
-from gepa.logging.experiment_tracker import create_experiment_tracker
 from gepa.logging.utils import log_detailed_metrics_after_discovering_new_program
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
@@ -39,12 +38,7 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         merge_proposer: MergeProposer | None,
         # Logging
         logger: Any,
-        use_wandb: bool = False,
-        wandb_api_key: str | None = None,
-        wandb_init_kwargs: dict[str, Any] | None = None,
-        use_mlflow: bool = False,
-        mlflow_tracking_uri: str | None = None,
-        mlflow_experiment_name: str | None = None,
+        experiment_tracker: Any,
         track_best_outputs: bool = False,
         display_progress_bar: bool = False,
         raise_on_exception: bool = True,
@@ -61,23 +55,8 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
         self.max_metric_calls = max_metric_calls
 
         self.perfect_score = perfect_score
-        self.use_wandb = use_wandb
-        self.wandb_api_key = wandb_api_key
-        self.wandb_init_kwargs = wandb_init_kwargs or {}
-        self.use_mlflow = use_mlflow
-        self.mlflow_tracking_uri = mlflow_tracking_uri
-        self.mlflow_experiment_name = mlflow_experiment_name
         self.seed = seed
-
-        # Create experiment tracker
-        self.experiment_tracker = create_experiment_tracker(
-            use_wandb=use_wandb,
-            wandb_api_key=wandb_api_key,
-            wandb_init_kwargs=wandb_init_kwargs,
-            use_mlflow=use_mlflow,
-            mlflow_tracking_uri=mlflow_tracking_uri,
-            mlflow_experiment_name=mlflow_experiment_name,
-        )
+        self.experiment_tracker = experiment_tracker
 
         self.reflective_proposer = reflective_proposer
         self.merge_proposer = merge_proposer
@@ -132,20 +111,12 @@ class GEPAEngine(Generic[DataInst, Trajectory, RolloutOutput]):
             valset_score=valset_score,
             new_program_idx=new_program_idx,
             valset_subscores=valset_subscores,
-            # new_instruction="Merged or Reflective program",
-            use_wandb=self.use_wandb,
-            use_mlflow=self.use_mlflow,
+            experiment_tracker=self.experiment_tracker,
             linear_pareto_front_program_idx=linear_pareto_front_program_idx,
         )
         return new_program_idx, linear_pareto_front_program_idx
 
     def run(self) -> GEPAState:
-        """Run the optimization with automatic experiment tracking setup."""
-        with self.experiment_tracker:
-            return self._run_optimization()
-
-    def _run_optimization(self) -> GEPAState:
-        """Internal method that runs the optimization without experiment tracking setup."""
         # Check tqdm availability if progress bar is enabled
         progress_bar = None
         if self.display_progress_bar:
