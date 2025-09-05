@@ -37,9 +37,6 @@ class ExperimentTracker:
         self.mlflow_tracking_uri = mlflow_tracking_uri
         self.mlflow_experiment_name = mlflow_experiment_name
 
-        self._wandb_run = None
-        self._mlflow_run = None
-
     def initialize(self):
         """Initialize the logging backends."""
         if self.use_wandb:
@@ -60,7 +57,7 @@ class ExperimentTracker:
         except Exception as e:
             raise RuntimeError(f"Error logging into wandb: {e}")
 
-        self._wandb_run = wandb.init(**self.wandb_init_kwargs)
+        wandb.init(**self.wandb_init_kwargs)
 
     def _initialize_mlflow(self):
         """Initialize mlflow."""
@@ -75,14 +72,14 @@ class ExperimentTracker:
         except Exception as e:
             raise RuntimeError(f"Error setting up mlflow: {e}")
 
-    def start_run(self, nested: bool = False):
+    def start_run(self):
         """Start a new run."""
         if self.use_wandb:
             # wandb doesn't need explicit start_run, it's handled in init
             pass
         if self.use_mlflow:
             import mlflow  # type: ignore
-            self._mlflow_run = mlflow.start_run(nested=nested)
+            mlflow.start_run(nested=True)
 
     def log_metrics(self, metrics: dict[str, Any], step: int | None = None):
         """Log metrics to the active backends."""
