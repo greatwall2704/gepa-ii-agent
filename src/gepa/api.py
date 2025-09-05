@@ -8,6 +8,7 @@ from gepa.adapters.default_adapter.default_adapter import DefaultAdapter
 from gepa.core.adapter import DataInst, GEPAAdapter, RolloutOutput, Trajectory
 from gepa.core.engine import GEPAEngine
 from gepa.core.result import GEPAResult
+from gepa.logging.experiment_tracker import create_experiment_tracker
 from gepa.logging.logger import LoggerProtocol, StdOutLogger
 from gepa.proposer.merge import MergeProposer
 from gepa.proposer.reflective_mutation.base import LanguageModel, ReflectionComponentSelector
@@ -42,6 +43,9 @@ def optimize(
     use_wandb: bool = False,
     wandb_api_key: str | None = None,
     wandb_init_kwargs: dict[str, Any] | None = None,
+    use_mlflow: bool = False,
+    mlflow_tracking_uri: str | None = None,
+    mlflow_experiment_name: str | None = None,
     track_best_outputs: bool = False,
     display_progress_bar: bool = False,
     # Reproducibility
@@ -113,6 +117,10 @@ def optimize(
     - use_wandb: Whether to use Weights and Biases to log the progress of the optimization.
     - wandb_api_key: The API key to use for Weights and Biases.
     - wandb_init_kwargs: Additional keyword arguments to pass to the Weights and Biases initialization.
+    - use_mlflow: Whether to use MLflow to log the progress of the optimization.
+      Both wandb and mlflow can be used simultaneously if desired.
+    - mlflow_tracking_uri: The tracking URI to use for MLflow.
+    - mlflow_experiment_name: The experiment name to use for MLflow.
     - track_best_outputs: Whether to track the best outputs on the validation set. If True, GEPAResult will contain the best outputs obtained for each task in the validation set.
 
     # Reproducibility
@@ -132,8 +140,8 @@ def optimize(
 
     if not hasattr(adapter, "propose_new_texts"):
         assert reflection_lm is not None, (
-            f"reflection_lm was not provided. The adapter used '{adapter!s}' does not provide a propose_new_texts method, " + \
-            "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
+            f"reflection_lm was not provided. The adapter used '{adapter!s}' does not provide a propose_new_texts method, "
+            + "and hence, GEPA will use the default proposer, which requires a reflection_lm to be specified."
         )
 
     if isinstance(reflection_lm, str):
@@ -172,6 +180,15 @@ def optimize(
 
     batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size, rng=rng)
 
+    experiment_tracker = create_experiment_tracker(
+        use_wandb=use_wandb,
+        wandb_api_key=wandb_api_key,
+        wandb_init_kwargs=wandb_init_kwargs,
+        use_mlflow=use_mlflow,
+        mlflow_tracking_uri=mlflow_tracking_uri,
+        mlflow_experiment_name=mlflow_experiment_name,
+    )
+
     reflective_proposer = ReflectiveMutationProposer(
         logger=logger,
         trainset=trainset,
@@ -181,7 +198,7 @@ def optimize(
         batch_sampler=batch_sampler,
         perfect_score=perfect_score,
         skip_perfect_score=skip_perfect_score,
-        use_wandb=use_wandb,
+        experiment_tracker=experiment_tracker,
         reflection_lm=reflection_lm,
     )
 
@@ -211,13 +228,14 @@ def optimize(
         reflective_proposer=reflective_proposer,
         merge_proposer=merge_proposer,
         logger=logger,
-        use_wandb=use_wandb,
-        wandb_api_key=wandb_api_key,
-        wandb_init_kwargs=wandb_init_kwargs,
+        experiment_tracker=experiment_tracker,
         track_best_outputs=track_best_outputs,
         display_progress_bar=display_progress_bar,
         raise_on_exception=raise_on_exception,
     )
-    state = engine.run()
+
+    with experiment_tracker:
+        state = engine.run()
+
     result = GEPAResult.from_state(state)
     return result
