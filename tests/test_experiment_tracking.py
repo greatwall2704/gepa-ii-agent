@@ -1,13 +1,10 @@
 import os
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
 
-# Add src to path for imports
-sys.path.insert(0, "src")
 from gepa.logging.experiment_tracker import ExperimentTracker, create_experiment_tracker
 
 
