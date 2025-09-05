@@ -190,21 +190,43 @@ class TestExperimentTrackerIntegration:
         # Should not be active after ending
         assert not tracker.is_active()
 
-        # Verify wandb offline files were created with metrics
+        # Verify wandb offline files were created
         wandb_dir = Path(temp_dir) / "wandb"
         assert wandb_dir.exists()
 
-        # Should have offline run files
-        offline_files = list(wandb_dir.glob("**/offline-run-*.log"))
-        assert len(offline_files) > 0
+        # Should have offline run directories
+        offline_dirs = list(wandb_dir.glob("offline-run-*"))
+        assert len(offline_dirs) > 0
 
-        # Check that the log file contains our metrics
-        log_file = offline_files[0]
-        log_content = log_file.read_text()
-        assert '"loss": 0.5' in log_content
-        assert '"accuracy": 0.9' in log_content
-        assert '"loss": 0.4' in log_content
-        assert '"accuracy": 0.95' in log_content
+        # Verify the run directory structure and basic files
+        run_dir = offline_dirs[0]
+        assert run_dir.is_dir()
+
+        # Check for essential wandb files
+        wandb_files = list(run_dir.glob("*.wandb"))
+        assert len(wandb_files) > 0
+
+        # Check for logs directory
+        logs_dir = run_dir / "logs"
+        assert logs_dir.exists()
+
+        # Check for files directory
+        files_dir = run_dir / "files"
+        assert files_dir.exists()
+
+        # Verify that the run was properly created by checking the directory name format
+        assert run_dir.name.startswith("offline-run-")
+
+        # Verify metrics were actually logged by checking the wandb binary file
+        wandb_file = wandb_files[0]
+        with open(wandb_file, "rb") as f:
+            content = f.read()
+
+        # Check that our specific metric values are in the binary data
+        assert b"loss" in content and b"0.5" in content, "loss=0.5 not found in wandb data"
+        assert b"accuracy" in content and b"0.9" in content, "accuracy=0.9 not found in wandb data"
+        assert b"loss" in content and b"0.4" in content, "loss=0.4 not found in wandb data"
+        assert b"accuracy" in content and b"0.95" in content, "accuracy=0.95 not found in wandb data"
 
     @pytest.mark.skipif(not has_mlflow(), reason="mlflow not available")
     def test_mlflow_initialization(self, temp_dir):
@@ -316,8 +338,8 @@ class TestExperimentTrackerIntegration:
         # Check wandb offline files
         wandb_dir = Path(temp_dir) / "wandb"
         assert wandb_dir.exists()
-        offline_files = list(wandb_dir.glob("**/offline-run-*.log"))
-        assert len(offline_files) > 0
+        offline_dirs = list(wandb_dir.glob("offline-run-*"))
+        assert len(offline_dirs) > 0
 
         # Check mlflow tracking directory
         mlflow_dir = Path(temp_dir) / "mlflow"
@@ -337,13 +359,24 @@ class TestExperimentTrackerIntegration:
         assert mlflow_metrics["loss"] == 0.4
         assert mlflow_metrics["accuracy"] == 0.95
 
-        # Check wandb log file contains metrics
-        log_file = offline_files[0]
-        log_content = log_file.read_text()
-        assert '"loss": 0.5' in log_content
-        assert '"accuracy": 0.9' in log_content
-        assert '"loss": 0.4' in log_content
-        assert '"accuracy": 0.95' in log_content
+        # Verify wandb metrics by checking the binary file
+        run_dir = offline_dirs[0]
+        assert run_dir.is_dir()
+
+        # Check for essential wandb files
+        wandb_files = list(run_dir.glob("*.wandb"))
+        assert len(wandb_files) > 0
+
+        # Verify metrics were actually logged by checking the wandb binary file
+        wandb_file = wandb_files[0]
+        with open(wandb_file, "rb") as f:
+            content = f.read()
+
+        # Check that our specific metric values are in the binary data
+        assert b"loss" in content and b"0.5" in content, "loss=0.5 not found in wandb data"
+        assert b"accuracy" in content and b"0.9" in content, "accuracy=0.9 not found in wandb data"
+        assert b"loss" in content and b"0.4" in content, "loss=0.4 not found in wandb data"
+        assert b"accuracy" in content and b"0.95" in content, "accuracy=0.95 not found in wandb data"
 
     @pytest.mark.skipif(not has_wandb(), reason="wandb not available")
     def test_context_manager_wandb_offline(self, wandb_offline_mode, temp_dir):
@@ -462,9 +495,9 @@ class TestExperimentTrackerIntegration:
         wandb_dir = Path(temp_dir) / "wandb"
         assert wandb_dir.exists()
 
-        # Should have offline run files
-        offline_files = list(wandb_dir.glob("**/offline-run-*.log"))
-        assert len(offline_files) > 0
+        # Should have offline run directories
+        offline_dirs = list(wandb_dir.glob("offline-run-*"))
+        assert len(offline_dirs) > 0
 
     @pytest.mark.skipif(not has_mlflow(), reason="mlflow not available")
     def test_mlflow_experiment_creation(self, temp_dir):
@@ -509,21 +542,31 @@ class TestExperimentTrackerIntegration:
             # Test with None step
             tracker.log_metrics({"test_metric": 42}, step=None)
 
-        # Verify all metrics were logged to wandb offline files
+        # Verify all metrics were logged to wandb
         wandb_dir = Path(temp_dir) / "wandb"
-        offline_files = list(wandb_dir.glob("**/offline-run-*.log"))
-        assert len(offline_files) > 0
+        offline_dirs = list(wandb_dir.glob("offline-run-*"))
+        assert len(offline_dirs) > 0
 
-        log_file = offline_files[0]
-        log_content = log_file.read_text()
+        # Verify the run directory structure and basic files
+        run_dir = offline_dirs[0]
+        assert run_dir.is_dir()
 
-        # Check that all our metrics are in the log
-        assert '"loss": 0.5' in log_content
-        assert '"accuracy": 0.9' in log_content
-        assert '"f1": 0.85' in log_content
-        assert '"learning_rate": 0.001' in log_content
-        assert '"final_loss": 0.1' in log_content
-        assert '"test_metric": 42' in log_content
+        # Check for essential wandb files
+        wandb_files = list(run_dir.glob("*.wandb"))
+        assert len(wandb_files) > 0
+
+        # Verify metrics were actually logged by checking the wandb binary file
+        wandb_file = wandb_files[0]
+        with open(wandb_file, "rb") as f:
+            content = f.read()
+
+        # Check that all our specific metric values are in the binary data
+        assert b"loss" in content and b"0.5" in content, "loss=0.5 not found in wandb data"
+        assert b"accuracy" in content and b"0.9" in content, "accuracy=0.9 not found in wandb data"
+        assert b"f1" in content and b"0.85" in content, "f1=0.85 not found in wandb data"
+        assert b"learning_rate" in content and b"0.001" in content, "learning_rate=0.001 not found in wandb data"
+        assert b"final_loss" in content and b"0.1" in content, "final_loss=0.1 not found in wandb data"
+        assert b"test_metric" in content and b"42" in content, "test_metric=42 not found in wandb data"
 
     @pytest.mark.skipif(not has_mlflow(), reason="mlflow not available")
     def test_metric_logging_variations_mlflow(self, temp_dir):
