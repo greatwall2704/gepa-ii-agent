@@ -57,8 +57,6 @@ class ExperimentTracker:
         except Exception as e:
             raise RuntimeError(f"Error logging into wandb: {e}")
 
-        wandb.init(**self.wandb_init_kwargs)
-
     def _initialize_mlflow(self):
         """Initialize mlflow."""
         try:
@@ -75,8 +73,8 @@ class ExperimentTracker:
     def start_run(self):
         """Start a new run."""
         if self.use_wandb:
-            # wandb doesn't need explicit start_run, it's handled in init
-            pass
+            import wandb  # type: ignore
+            wandb.init(**self.wandb_init_kwargs)
         if self.use_mlflow:
             import mlflow  # type: ignore
             mlflow.start_run(nested=True)
@@ -114,6 +112,26 @@ class ExperimentTracker:
                     mlflow.end_run()
             except Exception as e:
                 print(f"Warning: Failed to end mlflow run: {e}")
+
+    def is_active(self) -> bool:
+        """Check if any backend has an active run."""
+        if self.use_wandb:
+            try:
+                import wandb  # type: ignore
+                if wandb.run is not None:
+                    return True
+            except Exception:
+                pass
+
+        if self.use_mlflow:
+            try:
+                import mlflow  # type: ignore
+                if mlflow.active_run() is not None:
+                    return True
+            except Exception:
+                pass
+
+        return False
 
 
 def create_experiment_tracker(
