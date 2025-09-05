@@ -212,9 +212,7 @@ def optimize(
         raise_on_exception=raise_on_exception,
     )
 
-    # Use context manager for proper resource cleanup
-    with engine:
-        state = engine._run_optimization()
+    state = engine.run()
 
     result = GEPAResult.from_state(state)
     return result
