@@ -15,7 +15,7 @@ from gepa.proposer.reflective_mutation.base import LanguageModel, ReflectionComp
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
 from gepa.strategies.batch_sampler import EpochShuffledBatchSampler
 from gepa.strategies.candidate_selector import CurrentBestCandidateSelector, ParetoCandidateSelector
-from gepa.strategies.component_selector import RoundRobinReflectionComponentSelector
+from gepa.strategies.component_selector import AllReflectionComponentSelector, RoundRobinReflectionComponentSelector
 
 
 def optimize(
@@ -102,7 +102,7 @@ def optimize(
     - perfect_score: The perfect score to achieve.
 
     # Component selection configuration
-    - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance, a string ('round_robin'), or None. If None, defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order.
+    - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance, a string ('round_robin', 'all'), or None. If None, defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order. The 'all' strategy selects all components for modification.
 
     # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
@@ -170,10 +170,11 @@ def optimize(
     if isinstance(module_selector, str):
         module_selector_cls = {
             "round_robin": RoundRobinReflectionComponentSelector,
+            "all": AllReflectionComponentSelector,
         }.get(module_selector)
 
         assert module_selector_cls is not None, (
-            f"Unknown module_selector strategy: {module_selector}. Supported strategies: 'round_robin'"
+            f"Unknown module_selector strategy: {module_selector}. Supported strategies: 'round_robin', 'all'"
         )
 
         module_selector = module_selector_cls()

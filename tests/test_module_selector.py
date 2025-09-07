@@ -4,7 +4,7 @@ import pytest
 
 from gepa import optimize
 from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
-from gepa.strategies.component_selector import RoundRobinReflectionComponentSelector
+from gepa.strategies.component_selector import AllReflectionComponentSelector, RoundRobinReflectionComponentSelector
 
 
 @pytest.fixture
@@ -75,6 +75,30 @@ def test_module_selector_string_round_robin(mock_proposer, mock_run, common_mock
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
+def test_module_selector_string_all(mock_proposer, mock_run, common_mocks):
+    """Test that module_selector='all' works with optimize()."""
+    mock_run_return, mock_adapter = common_mocks
+    mock_run.return_value = mock_run_return
+
+    result = optimize(
+        seed_candidate={"test": "value"},
+        trainset=[],
+        adapter=mock_adapter,
+        reflection_lm=lambda x: "test response",
+        module_selector="all",
+        max_metric_calls=1,
+    )
+
+    # Verify that ReflectiveMutationProposer was called with an AllReflectionComponentSelector
+    mock_proposer.assert_called_once()
+    call_args = mock_proposer.call_args
+    module_selector = call_args.kwargs["module_selector"]
+    assert isinstance(module_selector, AllReflectionComponentSelector)
+    assert result is not None
+
+
+@patch("gepa.api.GEPAEngine.run")
+@patch("gepa.api.ReflectiveMutationProposer")
 def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
     """Test that module_selector accepts custom instances with optimize()."""
     mock_run_return, mock_adapter = common_mocks
@@ -103,16 +127,23 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
     assert result is not None
 
 
-def test_module_selector_invalid_string_raises_error(common_mocks):
-    """Test that invalid module_selector string raises AssertionError."""
-    _, mock_adapter = common_mocks
+def test_all_reflection_component_selector_behavior():
+    """Test that AllReflectionComponentSelector returns all component names."""
 
-    with pytest.raises(AssertionError, match="Unknown module_selector strategy"):
-        optimize(
-            seed_candidate={"test": "value"},
-            trainset=[],
-            adapter=mock_adapter,
-            reflection_lm=lambda x: "test response",
-            module_selector="invalid_strategy",
-            max_metric_calls=1,
-        )
+    # Create a mock state with multiple components
+    mock_state = Mock()
+    mock_state.list_of_named_predictors = ["component1", "component2", "component3"]
+
+    selector = AllReflectionComponentSelector()
+
+    # Call select_modules - should return all components
+    result = selector.select_modules(
+        state=mock_state,
+        trajectories=[],
+        subsample_scores=[],
+        candidate_idx=0,
+        candidate={"component1": "value1", "component2": "value2", "component3": "value3"},
+    )
+
+    assert result == ["component1", "component2", "component3"]
+    assert len(result) == 3
