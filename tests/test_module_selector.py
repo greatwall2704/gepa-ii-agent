@@ -27,17 +27,20 @@ def common_mocks():
 
 @patch("gepa.api.GEPAEngine.run")
 @patch("gepa.api.ReflectiveMutationProposer")
-def test_module_selector_none_defaults_to_round_robin(mock_proposer, mock_run, common_mocks):
-    """Test that module_selector=None defaults to round robin."""
+def test_module_selector_default_round_robin(mock_proposer, mock_run, common_mocks):
+    """Test that module_selector defaults to round robin."""
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
+    # Create mock data instances
+    mock_data = [Mock() for _ in range(3)]
+
     result = optimize(
         seed_candidate={"test": "value"},
-        trainset=[],
+        trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
-        module_selector=None,  # Explicitly test None
+        # Use default module_selector
         max_metric_calls=1,
     )
 
@@ -56,9 +59,12 @@ def test_module_selector_string_round_robin(mock_proposer, mock_run, common_mock
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
+    # Create mock data instances
+    mock_data = [Mock() for _ in range(3)]
+
     result = optimize(
         seed_candidate={"test": "value"},
-        trainset=[],
+        trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
         module_selector="round_robin",
@@ -80,9 +86,12 @@ def test_module_selector_string_all(mock_proposer, mock_run, common_mocks):
     mock_run_return, mock_adapter = common_mocks
     mock_run.return_value = mock_run_return
 
+    # Create mock data instances to avoid empty trainset concern
+    mock_data = [Mock() for _ in range(3)]
+
     result = optimize(
         seed_candidate={"test": "value"},
-        trainset=[],
+        trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
         module_selector="all",
@@ -110,9 +119,12 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
 
     custom_selector = CustomComponentSelector()
 
+    # Create mock data instances
+    mock_data = [Mock() for _ in range(3)]
+
     result = optimize(
         seed_candidate={"test": "value"},
-        trainset=[],
+        trainset=mock_data,
         adapter=mock_adapter,
         reflection_lm=lambda x: "test response",
         module_selector=custom_selector,
@@ -128,21 +140,21 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
 
 
 def test_all_reflection_component_selector_behavior():
-    """Test that AllReflectionComponentSelector returns all component names."""
+    """Test that AllReflectionComponentSelector returns all component names from candidate."""
 
-    # Create a mock state with multiple components
+    # Create a mock state (not used in the new implementation)
     mock_state = Mock()
-    mock_state.list_of_named_predictors = ["component1", "component2", "component3"]
 
     selector = AllReflectionComponentSelector()
 
-    # Call select_modules - should return all components
+    # Call select_modules - should return all components from candidate
+    candidate = {"component1": "value1", "component2": "value2", "component3": "value3"}
     result = selector.select_modules(
         state=mock_state,
         trajectories=[],
         subsample_scores=[],
         candidate_idx=0,
-        candidate={"component1": "value1", "component2": "value2", "component3": "value3"},
+        candidate=candidate,
     )
 
     assert result == ["component1", "component2", "component3"]
@@ -153,10 +165,13 @@ def test_module_selector_invalid_string_raises_error(common_mocks):
     """Test that invalid module_selector string raises AssertionError."""
     _, mock_adapter = common_mocks
 
+    # Create mock data instances
+    mock_data = [Mock() for _ in range(3)]
+
     with pytest.raises(AssertionError, match="Unknown module_selector strategy"):
         optimize(
             seed_candidate={"test": "value"},
-            trainset=[],
+            trainset=mock_data,
             adapter=mock_adapter,
             reflection_lm=lambda x: "test response",
             module_selector="invalid_strategy",

@@ -31,7 +31,7 @@ def optimize(
     reflection_minibatch_size=3,
     perfect_score=1,
     # Component selection configuration
-    module_selector: "ReflectionComponentSelector | str | None" = None,
+    module_selector: "ReflectionComponentSelector | str" = "round_robin",
     # Merge-based configuration
     use_merge=False,
     max_merge_invocations=5,
@@ -102,7 +102,7 @@ def optimize(
     - perfect_score: The perfect score to achieve.
 
     # Component selection configuration
-    - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance, a string ('round_robin', 'all'), or None. If None, defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order. The 'all' strategy selects all components for modification.
+    - module_selector: Component selection strategy. Can be a ReflectionComponentSelector instance or a string ('round_robin', 'all'). Defaults to 'round_robin'. The 'round_robin' strategy cycles through components in order. The 'all' strategy selects all components for modification in every GEPA iteration.
 
     # Merge-based configuration
     - use_merge: Whether to use the merge strategy.
@@ -164,8 +164,6 @@ def optimize(
     candidate_selector = (
         ParetoCandidateSelector(rng=rng) if candidate_selection_strategy == "pareto" else CurrentBestCandidateSelector()
     )
-
-    module_selector = module_selector or "round_robin"
 
     if isinstance(module_selector, str):
         module_selector_cls = {

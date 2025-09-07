@@ -33,4 +33,4 @@ class AllReflectionComponentSelector(ReflectionComponentSelector):
         candidate_idx: int,
         candidate: dict[str, str],
     ) -> list[str]:
-        return list(state.list_of_named_predictors)
+        return list(candidate.keys())
