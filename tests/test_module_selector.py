@@ -147,3 +147,18 @@ def test_all_reflection_component_selector_behavior():
 
     assert result == ["component1", "component2", "component3"]
     assert len(result) == 3
+
+
+def test_module_selector_invalid_string_raises_error(common_mocks):
+    """Test that invalid module_selector string raises AssertionError."""
+    _, mock_adapter = common_mocks
+
+    with pytest.raises(AssertionError, match="Unknown module_selector strategy"):
+        optimize(
+            seed_candidate={"test": "value"},
+            trainset=[],
+            adapter=mock_adapter,
+            reflection_lm=lambda x: "test response",
+            module_selector="invalid_strategy",
+            max_metric_calls=1,
+        )
