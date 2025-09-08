@@ -15,7 +15,10 @@ from gepa.proposer.reflective_mutation.base import LanguageModel, ReflectionComp
 from gepa.proposer.reflective_mutation.reflective_mutation import ReflectiveMutationProposer
 from gepa.strategies.batch_sampler import EpochShuffledBatchSampler
 from gepa.strategies.candidate_selector import CurrentBestCandidateSelector, ParetoCandidateSelector
-from gepa.strategies.component_selector import AllReflectionComponentSelector, RoundRobinReflectionComponentSelector
+from gepa.strategies.component_selector import (
+    all_reflection_component_selector,
+    round_robin_reflection_component_selector,
+)
 
 
 def optimize(
@@ -166,16 +169,16 @@ def optimize(
     )
 
     if isinstance(module_selector, str):
-        module_selector_cls = {
-            "round_robin": RoundRobinReflectionComponentSelector,
-            "all": AllReflectionComponentSelector,
+        module_selector_fn = {
+            "round_robin": round_robin_reflection_component_selector,
+            "all": all_reflection_component_selector,
         }.get(module_selector)
 
-        assert module_selector_cls is not None, (
+        assert module_selector_fn is not None, (
             f"Unknown module_selector strategy: {module_selector}. Supported strategies: 'round_robin', 'all'"
         )
 
-        module_selector = module_selector_cls()
+        module_selector = module_selector_fn
 
     batch_sampler = EpochShuffledBatchSampler(minibatch_size=reflection_minibatch_size, rng=rng)
 
