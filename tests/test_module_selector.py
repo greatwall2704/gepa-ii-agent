@@ -114,7 +114,7 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
     mock_run.return_value = mock_run_return
 
     class CustomComponentSelector(ReflectionComponentSelector):
-        def select_modules(self, state, trajectories, subsample_scores, candidate_idx, candidate):
+        def __call__(self, state, trajectories, subsample_scores, candidate_idx, candidate):
             return ["test_component"]
 
     custom_selector = CustomComponentSelector()
@@ -147,9 +147,9 @@ def test_all_reflection_component_selector_behavior():
 
     selector = AllReflectionComponentSelector()
 
-    # Call select_modules - should return all components from candidate
+    # Call selector - should return all components from candidate
     candidate = {"component1": "value1", "component2": "value2", "component3": "value3"}
-    result = selector.select_modules(
+    result = selector(
         state=mock_state,
         trajectories=[],
         subsample_scores=[],

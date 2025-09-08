@@ -8,7 +8,7 @@ from gepa.proposer.reflective_mutation.base import ReflectionComponentSelector
 
 
 class RoundRobinReflectionComponentSelector(ReflectionComponentSelector):
-    def select_modules(
+    def __call__(
         self,
         state: GEPAState,
         trajectories: list[Trajectory],
@@ -25,7 +25,7 @@ class RoundRobinReflectionComponentSelector(ReflectionComponentSelector):
 
 
 class AllReflectionComponentSelector(ReflectionComponentSelector):
-    def select_modules(
+    def __call__(
         self,
         state: GEPAState,
         trajectories: list[Trajectory],
