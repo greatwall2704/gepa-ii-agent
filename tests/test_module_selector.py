@@ -4,8 +4,8 @@ import pytest
 
 from gepa import optimize
 from gepa.strategies.component_selector import (
-    all_reflection_component_selector,
-    round_robin_reflection_component_selector,
+    AllReflectionComponentSelector,
+    RoundRobinReflectionComponentSelector,
 )
 
 
@@ -46,11 +46,11 @@ def test_module_selector_default_round_robin(mock_proposer, mock_run, common_moc
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with round_robin_reflection_component_selector
+    # Verify that ReflectiveMutationProposer was called with RoundRobinReflectionComponentSelector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
-    assert module_selector is round_robin_reflection_component_selector
+    assert isinstance(module_selector, RoundRobinReflectionComponentSelector)
     assert result is not None
 
 
@@ -73,11 +73,11 @@ def test_module_selector_string_round_robin(mock_proposer, mock_run, common_mock
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with round_robin_reflection_component_selector
+    # Verify that ReflectiveMutationProposer was called with RoundRobinReflectionComponentSelector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
-    assert module_selector is round_robin_reflection_component_selector
+    assert isinstance(module_selector, RoundRobinReflectionComponentSelector)
     assert result is not None
 
 
@@ -100,11 +100,11 @@ def test_module_selector_string_all(mock_proposer, mock_run, common_mocks):
         max_metric_calls=1,
     )
 
-    # Verify that ReflectiveMutationProposer was called with all_reflection_component_selector
+    # Verify that ReflectiveMutationProposer was called with AllReflectionComponentSelector
     mock_proposer.assert_called_once()
     call_args = mock_proposer.call_args
     module_selector = call_args.kwargs["module_selector"]
-    assert module_selector is all_reflection_component_selector
+    assert isinstance(module_selector, AllReflectionComponentSelector)
     assert result is not None
 
 
@@ -141,14 +141,15 @@ def test_module_selector_custom_instance(mock_proposer, mock_run, common_mocks):
 
 
 def test_all_reflection_component_selector_behavior():
-    """Test that all_reflection_component_selector returns all component names from candidate."""
+    """Test that AllReflectionComponentSelector returns all component names from candidate."""
 
     # Create a mock state (not used in the new implementation)
     mock_state = Mock()
 
-    # Call selector function directly - should return all components from candidate
+    # Call selector class instance directly - should return all components from candidate
+    selector = AllReflectionComponentSelector()
     candidate = {"component1": "value1", "component2": "value2", "component3": "value3"}
-    result = all_reflection_component_selector(
+    result = selector(
         state=mock_state,
         trajectories=[],
         subsample_scores=[],
