@@ -1,5 +1,6 @@
 import argparse
 import json
+import os
 from pathlib import Path
 
 import litellm
@@ -14,6 +15,22 @@ from gepa.adapters.terminal_bench_adapter.terminal_bench_adapter import (
 )
 
 INSTRUCTION_PROMPT_PATH = Path(__file__).parent / "prompt-templates/instruction_prompt.txt"
+II_PROMPT_PATH = Path(__file__).parent / "prompts" / "ii_system_prompt.txt"
+
+
+def _load_env_file(env_path: str | None):
+    if not env_path:
+        return
+    p = Path(env_path)
+    if not p.exists():
+        print(f"Warning: env file not found at {env_path}")
+        return
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, v = line.split("=", 1)
+        os.environ[k.strip()] = v.strip()
 
 
 class TerminusWrapper(Terminus):
@@ -57,24 +74,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str, default="gpt-4o-mini")
     parser.add_argument("--n_concurrent", type=int, default=6)
+    parser.add_argument("--env_file", type=str, default=str(Path(__file__).parent / ".env"))
     args = parser.parse_args()
 
-    initial_prompt_from_terminus = """
-You are an AI assistant tasked with solving command-line tasks in a Linux environment. You will be given a task instruction and the output from previously executed commands. Your goal is to solve the task by providing batches of shell commands.
+    # Load .env (OpenAI-compatible base/key, default models)
+    _load_env_file(args.env_file)
+    model_name = os.environ.get("TASK_MODEL", args.model_name)
+    n_concurrent = int(os.environ.get("TB_N_CONCURRENT", str(args.n_concurrent)))
 
-For each response:
-1. Analyze the current state based on any terminal output provided
-2. Determine the next set of commands needed to make progress
-3. Decide if you need to see the output of these commands before proceeding
-
-Don't include markdown formatting.
-
-Note that you operate directly on the terminal from inside a tmux session. Use tmux keystrokes like `C-x` or `Escape` to interactively navigate the terminal. If you would like to execute a command that you have written you will need to append a newline character to the end of your command.
-
-For example, if you write "ls -la" you will need to append a newline character to the end of your command like this: `ls -la\n`.
-
-One thing to be very careful about is handling interactive sessions like less, vim, or git diff. In these cases, you should not wait for the output of the command. Instead, you should send the keystrokes to the terminal as if you were typing them.
-"""
+    # Seed prompt: your II system prompt (can customize here)
+    try:
+        initial_prompt_from_terminus = II_PROMPT_PATH.read_text(encoding="utf-8")
+    except Exception:
+        # Fallback to the default instruction if II prompt missing
+        initial_prompt_from_terminus = INSTRUCTION_PROMPT_PATH.read_text(encoding="utf-8")
 
     terminal_bench_dataset = Dataset(name="terminal-bench-core", version="head")
     terminal_bench_dataset.sort_by_duration()
@@ -82,28 +95,28 @@ One thing to be very careful about is handling interactive sessions like less, v
     terminal_bench_tasks = terminal_bench_dataset._tasks[::-1]
 
     trainset = [
-        TerminalBenchTask(task_id=task.name, model_name=args.model_name) for task in terminal_bench_tasks[30:50]
+        TerminalBenchTask(task_id=task.name, model_name=model_name) for task in terminal_bench_tasks[45:50]
     ]
-    valset = [TerminalBenchTask(task_id=task.name, model_name=args.model_name) for task in terminal_bench_tasks[:30]]
+    valset = [TerminalBenchTask(task_id=task.name, model_name=model_name) for task in terminal_bench_tasks[:3]]
 
     testset = [
-        TerminalBenchTask(task_id=task.name, model_name=args.model_name)
-        for task in terminal_bench_tasks[50:]
+        TerminalBenchTask(task_id=task.name, model_name=model_name)
+        for task in terminal_bench_tasks[50:52]
         if task.name != "chem-rf"
     ]
 
-    reflection_lm_name = "openai/gpt-5"
+    reflection_lm_name = os.environ.get("REFLECTION_MODEL", "openai/gpt-5")
+    # Use a plain OpenAI-compatible call for reflection (avoid provider-specific params)
     reflection_lm = (
         lambda prompt: litellm.completion(
             model=reflection_lm_name,
             messages=[{"role": "user", "content": prompt}],
-            reasoning_effort="high",
         )
         .choices[0]
         .message.content
     )
 
-    adapter = TerminusAdapter(n_concurrent=args.n_concurrent, instruction_prompt_path=INSTRUCTION_PROMPT_PATH)
+    adapter = TerminusAdapter(n_concurrent=n_concurrent, instruction_prompt_path=INSTRUCTION_PROMPT_PATH)
     testset_results_no_prompt = adapter.evaluate(testset, {"instruction_prompt": ""}, capture_traces=True)
     testset_results_before_opt = adapter.evaluate(
         testset,
@@ -111,7 +124,11 @@ One thing to be very careful about is handling interactive sessions like less, v
         capture_traces=True,
     )
 
-    with open("gepa_terminus/testset_results_no_prompt.json", "w") as f:
+    # Ensure output directory exists (configurable via env GEPA_TB_RUN_DIR)
+    out_dir = Path(os.environ.get("GEPA_TB_RUN_DIR", "gepa_terminus"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    with open(out_dir / "testset_results_no_prompt.json", "w") as f:
         json.dump(
             {
                 "score": sum(trajectory["success"] for trajectory in testset_results_no_prompt.trajectories),
@@ -120,7 +137,7 @@ One thing to be very careful about is handling interactive sessions like less, v
             f,
             indent=4,
         )
-    with open("gepa_terminus/testset_results_before_opt.json", "w") as f:
+    with open(out_dir / "testset_results_before_opt.json", "w") as f:
         json.dump(
             {
                 "score": sum(trajectory["success"] for trajectory in testset_results_before_opt.trajectories),
@@ -137,11 +154,11 @@ One thing to be very careful about is handling interactive sessions like less, v
         adapter=adapter,
         reflection_lm=reflection_lm,
         use_wandb=True,
-        max_metric_calls=400,
+        max_metric_calls=int(os.environ.get("GEPA_TB_MAX_METRIC_CALLS", "400")),
         reflection_minibatch_size=3,
         perfect_score=1,
         skip_perfect_score=False,
-        run_dir="gepa_terminus",
+        run_dir=str(out_dir),
     )
 
     testset_results_after_opt = adapter.evaluate(
@@ -150,7 +167,7 @@ One thing to be very careful about is handling interactive sessions like less, v
         capture_traces=True,
     )
 
-    with open("gepa_terminus/optimized_results.json", "w") as f:
+    with open(out_dir / "optimized_results.json", "w") as f:
         json.dump(
             {
                 "score": sum(trajectory["success"] for trajectory in testset_results_after_opt.trajectories),

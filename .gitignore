@@ -208,3 +208,6 @@ __marimo__/
 # Experiments
 runs/
 gepa_terminus/
+gepa_terminus_split/
+gepa_terminus_split_trial_2/
+wandb/
